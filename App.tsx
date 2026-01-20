@@ -69,8 +69,11 @@ const OnlineUserCounter: React.FC = () => {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'offline' | 'config_missing'>('connecting');
 
   useEffect(() => {
-    // 1. Prioritize Environment Variables, fallback to Hardcoded Config
-    const env = (import.meta as any).env || {};
+    // 1. Get Config - SAFE ACCESS to prevent crash
+    // Use an intermediate variable to ensure we don't read property of undefined
+    const meta = import.meta as any;
+    const env = meta.env || {}; 
+    
     const config = {
       apiKey: env.VITE_FB_API_KEY || HARDCODED_FIREBASE_CONFIG.apiKey,
       authDomain: env.VITE_FB_AUTH_DOMAIN || HARDCODED_FIREBASE_CONFIG.authDomain,
@@ -83,67 +86,82 @@ const OnlineUserCounter: React.FC = () => {
 
     // If still no config, show warning state
     if (!config.apiKey || !config.databaseURL) {
-      console.warn("ASTRA: Firebase Config Missing. Please set VITE_FB_... in .env or update HARDCODED_FIREBASE_CONFIG in App.tsx");
-      setStatus('config_missing');
-      return;
+      // Only warn if also missing hardcoded fallback
+      if (!HARDCODED_FIREBASE_CONFIG.databaseURL) {
+        console.warn("ASTRA: Firebase Config Missing. Please set VITE_FB_... in .env or update HARDCODED_FIREBASE_CONFIG in App.tsx");
+        setStatus('config_missing');
+      } else {
+        // We have hardcoded config but maybe environment didn't load, proceed to try connection
+      }
     }
 
-    try {
-      // 2. Initialize Firebase
-      const appName = 'AstraOnlineCounter';
-      let app;
-      try {
-        app = initializeApp(config, appName);
-      } catch (e: any) {
-        if (e.code === 'app/duplicate-app') {
-            // FIX: If app exists, retrieve it instead of leaving it undefined
-            app = getApp(appName);
-        } else {
-            console.error("Firebase Init Failed:", e);
-            setStatus('offline');
-            return;
+    // Proceed if we have at least a URL
+    if (config.databaseURL) {
+        try {
+          // 2. Initialize Firebase
+          const appName = 'AstraOnlineCounter';
+          let app;
+          try {
+            app = initializeApp(config, appName);
+          } catch (e: any) {
+            if (e.code === 'app/duplicate-app') {
+                // If app exists, retrieve it instead of creating new
+                try {
+                  app = getApp(appName);
+                } catch (err) {
+                  console.error("Firebase GetApp Error:", err);
+                  setStatus('offline');
+                  return;
+                }
+            } else {
+                console.error("Firebase Init Failed:", e);
+                setStatus('offline');
+                return;
+            }
+          }
+          
+          const db = getDatabase(app);
+          const connectedRef = ref(db, ".info/connected");
+          const listRef = ref(db, 'online_users');
+          const userRef = push(listRef);
+
+          // 3. Monitor Connection State
+          const connectedUnsub = onValue(connectedRef, (snap) => {
+            if (snap.val() === true) {
+                setStatus('connected');
+                // Remove self on disconnect
+                onDisconnect(userRef).remove();
+                // Add self
+                set(userRef, {
+                    joined: serverTimestamp(),
+                    device: navigator.userAgent
+                });
+            } else {
+                // Keep previous status if we were connected, or 'offline' if initial
+            }
+          });
+
+          // 4. Listen for count changes
+          const countUnsub = onValue(listRef, (snapshot) => {
+            if (snapshot.exists()) {
+              setOnlineCount(snapshot.size);
+            } else {
+              setOnlineCount(1);
+            }
+          });
+
+          return () => {
+            connectedUnsub();
+            countUnsub();
+            set(userRef, null); 
+          };
+
+        } catch (err) {
+          console.error("Firebase Error:", err);
+          setStatus('offline');
         }
-      }
-      
-      const db = getDatabase(app);
-      const connectedRef = ref(db, ".info/connected");
-      const listRef = ref(db, 'online_users');
-      const userRef = push(listRef);
-
-      // 3. Monitor Connection State
-      const connectedUnsub = onValue(connectedRef, (snap) => {
-        if (snap.val() === true) {
-            setStatus('connected');
-            // Remove self on disconnect
-            onDisconnect(userRef).remove();
-            // Add self
-            set(userRef, {
-                joined: serverTimestamp(),
-                device: navigator.userAgent
-            });
-        } else {
-            setStatus('offline');
-        }
-      });
-
-      // 4. Listen for count changes
-      const countUnsub = onValue(listRef, (snapshot) => {
-        if (snapshot.exists()) {
-          setOnlineCount(snapshot.size);
-        } else {
-          setOnlineCount(1);
-        }
-      });
-
-      return () => {
-        connectedUnsub();
-        countUnsub();
-        set(userRef, null); // Remove self immediately on unmount
-      };
-
-    } catch (err) {
-      console.error("Firebase Error:", err);
-      setStatus('offline');
+    } else {
+       setStatus('config_missing');
     }
   }, []);
 
