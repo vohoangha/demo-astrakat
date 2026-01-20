@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Astra - Creative From The Stars</title>
+    <link rel="icon" href="https://drive.google.com/thumbnail?id=15neYV9SX3Stezx_yGzn47dfbxMsn3YsX" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #005060;
+        color: white;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        overflow-x: hidden;
+      }
+      ::-webkit-scrollbar { width: 0px; background: transparent; }
+      .animate-gradient-x { background-size: 200% 200%; animation: gradient-x 3s ease infinite; }
+      @keyframes gradient-x { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+      .animate-spin-slow { animation: spin 3s linear infinite; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+    
+    <!-- HIGH SECURITY SCRIPT (SAFE MODE) -->
+    <script id="x-security-core">
+      (function(){
+        // 1. Freeze Console (Safe Mode - Warnings Only)
+        try {
+            var _c = window.console;
+        } catch(e) {}
+
+        // 2. Anti-Iframe
+        try { if(window.top !== window.self) window.top.location = window.self.location; } catch(e){}
+
+        // 3. Aggressive Event Blocking
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function(e) {
+            if(e.keyCode == 123) return false; // F12
+            if(e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74 || e.keyCode == 67)) return false; // I,J,C
+            if(e.ctrlKey && (e.keyCode == 85 || e.keyCode == 83 || e.keyCode == 80)) return false; // U,S,P
+        }
+
+        // 4. Integrity Check Only
+        var _id = 'x-security-core';
+        setInterval(function(){
+            if(!document.getElementById(_id)) {
+                document.body.innerHTML = '';
+                window.location.reload();
+            }
+        }, 1000);
+      })();
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "firebase/app": "https://esm.sh/firebase@10.12.0/app",
+    "firebase/database": "https://esm.sh/firebase@10.12.0/database",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
