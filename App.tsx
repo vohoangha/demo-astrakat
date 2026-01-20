@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { initializeApp, getApp } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, onDisconnect, set, push, serverTimestamp } from 'firebase/database';
 import { GlassCard } from './components/GlassCard';
 import { Button } from './components/Button';
@@ -34,26 +34,14 @@ import {
   Trash2,
   ShieldCheck,
   Users,
-  Wifi,
   WifiOff,
   AlertCircle
 } from 'lucide-react';
 
 // ==========================================
 // *** CẤU HÌNH DRIVE (QUAN TRỌNG) ***
+// Sau khi bạn Deploy script (bước 2), hãy dán URL có đuôi /exec vào dòng dưới đây:
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyKC7UigaUPX3kzhR3JSVA1-vxjC1wGlyDoCCELiE5f_xmmSu3-VTPD41tjPIUIRabNNA/exec'; 
-
-// *** CẤU HÌNH FIREBASE (DỰ PHÒNG) ***
-// Nếu bạn không dùng file .env, hãy điền thông tin Firebase của bạn vào đây để tính năng đếm người online hoạt động.
-const HARDCODED_FIREBASE_CONFIG = {
-  apiKey: "", 
-  authDomain: "",
-  databaseURL: "", // Quan trọng: Phải có URL này
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
 // ==========================================
 
 
@@ -69,129 +57,81 @@ const OnlineUserCounter: React.FC = () => {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'offline' | 'config_missing'>('connecting');
 
   useEffect(() => {
-    // 1. Get Config - SAFE ACCESS
-    // Wrap import.meta.env in a check to prevent crash if undefined
-    
-    const config = {
-      apiKey: (import.meta.env && import.meta.env.VITE_FB_API_KEY) || HARDCODED_FIREBASE_CONFIG.apiKey,
-      authDomain: (import.meta.env && import.meta.env.VITE_FB_AUTH_DOMAIN) || HARDCODED_FIREBASE_CONFIG.authDomain,
-      databaseURL: (import.meta.env && import.meta.env.VITE_FB_DB_URL) || HARDCODED_FIREBASE_CONFIG.databaseURL,
-      projectId: (import.meta.env && import.meta.env.VITE_FB_PROJECT_ID) || HARDCODED_FIREBASE_CONFIG.projectId,
-      storageBucket: (import.meta.env && import.meta.env.VITE_FB_STORAGE_BUCKET) || HARDCODED_FIREBASE_CONFIG.storageBucket,
-      messagingSenderId: (import.meta.env && import.meta.env.VITE_FB_MESSAGING_SENDER_ID) || HARDCODED_FIREBASE_CONFIG.messagingSenderId,
-      appId: (import.meta.env && import.meta.env.VITE_FB_APP_ID) || HARDCODED_FIREBASE_CONFIG.appId
+    // 1. Get Config - DIRECT & EXPLICIT ACCESS REQUIRED FOR VITE
+    // Vite replaces 'import.meta.env.VITE_...' with strings at build time.
+    // Using optional chaining (?.) to prevent crashes if import.meta.env is undefined
+    const firebaseConfig = {
+      apiKey: import.meta.env?.VITE_FB_API_KEY,
+      authDomain: import.meta.env?.VITE_FB_AUTH_DOMAIN,
+      databaseURL: import.meta.env?.VITE_FB_DB_URL,
+      projectId: import.meta.env?.VITE_FB_PROJECT_ID,
+      storageBucket: import.meta.env?.VITE_FB_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env?.VITE_FB_MESSAGING_SENDER_ID,
+      appId: import.meta.env?.VITE_FB_APP_ID
     };
 
-    // If still no config, show warning state
-    if (!config.apiKey || !config.databaseURL) {
-      // Only warn if also missing hardcoded fallback
-      if (!HARDCODED_FIREBASE_CONFIG.databaseURL) {
-        console.warn("ASTRA: Firebase Config Missing. Please set VITE_FB_... in .env or update HARDCODED_FIREBASE_CONFIG in App.tsx");
-        setStatus('config_missing');
-      } else {
-        // We have hardcoded config but maybe environment didn't load, proceed to try connection
-      }
+    // If no config found, just show warning state
+    if (!firebaseConfig.apiKey || !firebaseConfig.databaseURL) {
+      setStatus('config_missing');
+      return;
     }
 
-    // Proceed if we have at least a URL
-    if (config.databaseURL) {
-        try {
-          // 2. Initialize Firebase
-          const appName = 'AstraOnlineCounter';
-          let app;
-          try {
-            app = initializeApp(config, appName);
-          } catch (e: any) {
-            if (e.code === 'app/duplicate-app') {
-                // If app exists, retrieve it instead of creating new
-                try {
-                  app = getApp(appName);
-                } catch (err) {
-                  console.error("Firebase GetApp Error:", err);
-                  setStatus('offline');
-                  return;
-                }
-            } else {
-                console.error("Firebase Init Failed:", e);
-                setStatus('offline');
-                return;
-            }
-          }
-          
-          const db = getDatabase(app);
-          const connectedRef = ref(db, ".info/connected");
-          const listRef = ref(db, 'online_users');
-          const userRef = push(listRef);
+    try {
+      // 2. Initialize Firebase
+      // Use a unique name for the app to prevent re-initialization errors in React Strict Mode
+      const appName = 'AstraOnlineCounter';
+      let app;
+      try {
+        app = initializeApp(firebaseConfig, appName);
+      } catch (e: any) {
+         if (e.code === 'app/duplicate-app') {
+            // If app exists, ignore
+            return; 
+         }
+         console.error("Firebase Init Failed:", e);
+         setStatus('offline');
+         return;
+      }
+      
+      const db = getDatabase(app);
+      setStatus('connected');
 
-          // 3. Monitor Connection State
-          const connectedUnsub = onValue(connectedRef, (snap) => {
-            if (snap.val() === true) {
-                setStatus('connected');
-                // Remove self on disconnect
-                onDisconnect(userRef).remove();
-                // Add self
-                set(userRef, {
-                    joined: serverTimestamp(),
-                    device: navigator.userAgent
-                });
-            } else {
-                // Keep previous status if we were connected, or 'offline' if initial
-            }
-          });
+      // 3. Presence Logic
+      const listRef = ref(db, 'online_users');
+      const userRef = push(listRef);
 
-          // 4. Listen for count changes
-          const countUnsub = onValue(listRef, (snapshot) => {
-            if (snapshot.exists()) {
-              setOnlineCount(snapshot.size);
-            } else {
-              setOnlineCount(1);
-            }
-          });
+      // Self-cleaning: remove this user when they disconnect (close tab)
+      onDisconnect(userRef).remove();
 
-          return () => {
-            connectedUnsub();
-            countUnsub();
-            set(userRef, null); 
-          };
+      // Add self to the list
+      set(userRef, {
+        joined: serverTimestamp(),
+        device: navigator.userAgent
+      });
 
-        } catch (err) {
-          console.error("Firebase Error:", err);
-          setStatus('offline');
+      // 4. Listen for count changes
+      const unsubscribe = onValue(listRef, (snapshot) => {
+        if (snapshot.exists()) {
+          setOnlineCount(snapshot.size);
+        } else {
+          setOnlineCount(1);
         }
-    } else {
-       setStatus('config_missing');
+      });
+
+      return () => {
+        unsubscribe();
+        // Clean up self on component unmount
+        set(userRef, null); 
+      };
+
+    } catch (err) {
+      console.error("Firebase Init Error:", err);
+      setStatus('offline');
     }
   }, []);
 
-  // RENDER BASED ON STATUS
-  if (status === 'config_missing') {
-      return (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-900/30 border border-red-500/30 backdrop-blur-md" title="Missing Firebase Configuration">
-            <AlertCircle size={12} className="text-red-400" />
-            <span className="text-[10px] font-bold text-red-400 tracking-wider">NO CONFIG</span>
-        </div>
-      );
-  }
+  if (status === 'config_missing') return null;
 
-  if (status === 'offline') {
-      return (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-500/30 backdrop-blur-md" title="Connection Failed">
-            <WifiOff size={12} className="text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider">OFFLINE</span>
-        </div>
-      );
-  }
-
-  if (status === 'connecting') {
-      return (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#005060]/50 border border-[#e2b36e]/30 backdrop-blur-md">
-            <div className="h-2 w-2 rounded-full border border-[#e2b36e] border-t-transparent animate-spin"></div>
-            <span className="text-[10px] font-bold text-[#e2b36e] tracking-wider">CONNECTING...</span>
-        </div>
-      );
-  }
-
-  // CONNECTED STATE
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#005060]/50 border border-[#e2b36e]/30 backdrop-blur-md shadow-[0_0_10px_rgba(226,179,110,0.1)] animate-in fade-in duration-700">
       <div className="relative flex h-2 w-2">
@@ -616,8 +556,8 @@ const App: React.FC = () => {
   }, [error]);
 
   const checkApiKey = async () => {
-    // Check safely for env key
-    const envKey = import.meta.env && import.meta.env.VITE_API_KEY;
+    // Vite requires explicit import.meta.env.VITE_... access
+    const envKey = import.meta.env?.VITE_API_KEY;
     if (envKey) { setHasApiKey(true); return; }
     try {
       const win = window as any;
@@ -629,7 +569,7 @@ const App: React.FC = () => {
   };
 
   const handleApiKeySelect = async () => {
-    const envKey = import.meta.env && import.meta.env.VITE_API_KEY;
+    const envKey = import.meta.env?.VITE_API_KEY;
     if (envKey) { setHasApiKey(true); return; }
     const win = window as any;
     if (win.aistudio && win.aistudio.openSelectKey) {
@@ -775,7 +715,8 @@ const App: React.FC = () => {
 
     if (!hasApiKey) {
       await handleApiKeySelect();
-      const envKey = import.meta.env && import.meta.env.VITE_API_KEY;
+      // Vite requires explicit import.meta.env.VITE_... access
+      const envKey = import.meta.env?.VITE_API_KEY;
       if (!envKey) {
         const win = window as any;
         if (!win.aistudio || !(await win.aistudio.hasSelectedApiKey())) return;

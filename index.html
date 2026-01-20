@@ -33,6 +33,14 @@
         // 1. Freeze Console (Safe Mode - Warnings Only)
         try {
             var _c = window.console;
+            // We don't throw error here to avoid breaking AI Studio console logging
+            // But we can still annoy inspectors
+            /* 
+            Object.defineProperty(window, 'console', {
+                get: function() { if (_c._commandLineAPI) return _c; return _c; },
+                set: function(val) { _c = val; }
+            });
+            */
         } catch(e) {}
 
         // 2. Anti-Iframe
@@ -46,9 +54,10 @@
             if(e.ctrlKey && (e.keyCode == 85 || e.keyCode == 83 || e.keyCode == 80)) return false; // U,S,P
         }
 
-        // 4. Integrity Check Only
+        // 4. Integrity Check Only (Removed Viewport Check)
         var _id = 'x-security-core';
         setInterval(function(){
+            // Integrity: Check if this script tag still exists
             if(!document.getElementById(_id)) {
                 document.body.innerHTML = '';
                 window.location.reload();
@@ -60,20 +69,17 @@
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
-    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
     "firebase/app": "https://esm.sh/firebase@10.12.0/app",
     "firebase/database": "https://esm.sh/firebase@10.12.0/database",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "firebase/": "https://esm.sh/firebase@^12.8.0/"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>

@@ -52,10 +52,10 @@ const getApiKeys = (): string[] => {
   const keys: string[] = [];
 
   // Vite replaces these strings with actual values at build time
-  // Using safe access in case import.meta.env is undefined in some contexts
-  const k1 = import.meta.env && import.meta.env.VITE_API_KEY;
-  const k2 = import.meta.env && import.meta.env.VITE_API_KEY_2;
-  const k3 = import.meta.env && import.meta.env.VITE_API_KEY_3;
+  // Using direct static access with optional chaining avoids "undefined" errors at runtime
+  const k1 = import.meta.env?.VITE_API_KEY;
+  const k2 = import.meta.env?.VITE_API_KEY_2;
+  const k3 = import.meta.env?.VITE_API_KEY_3;
 
   if (k1) keys.push(k1.trim());
   if (k2) keys.push(k2.trim());
