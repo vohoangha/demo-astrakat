@@ -69,19 +69,17 @@ const OnlineUserCounter: React.FC = () => {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'offline' | 'config_missing'>('connecting');
 
   useEffect(() => {
-    // 1. Get Config - SAFE ACCESS to prevent crash
-    // Use an intermediate variable to ensure we don't read property of undefined
-    const meta = import.meta as any;
-    const env = meta.env || {}; 
+    // 1. Get Config - SAFE ACCESS
+    // Wrap import.meta.env in a check to prevent crash if undefined
     
     const config = {
-      apiKey: env.VITE_FB_API_KEY || HARDCODED_FIREBASE_CONFIG.apiKey,
-      authDomain: env.VITE_FB_AUTH_DOMAIN || HARDCODED_FIREBASE_CONFIG.authDomain,
-      databaseURL: env.VITE_FB_DB_URL || HARDCODED_FIREBASE_CONFIG.databaseURL,
-      projectId: env.VITE_FB_PROJECT_ID || HARDCODED_FIREBASE_CONFIG.projectId,
-      storageBucket: env.VITE_FB_STORAGE_BUCKET || HARDCODED_FIREBASE_CONFIG.storageBucket,
-      messagingSenderId: env.VITE_FB_MESSAGING_SENDER_ID || HARDCODED_FIREBASE_CONFIG.messagingSenderId,
-      appId: env.VITE_FB_APP_ID || HARDCODED_FIREBASE_CONFIG.appId
+      apiKey: (import.meta.env && import.meta.env.VITE_FB_API_KEY) || HARDCODED_FIREBASE_CONFIG.apiKey,
+      authDomain: (import.meta.env && import.meta.env.VITE_FB_AUTH_DOMAIN) || HARDCODED_FIREBASE_CONFIG.authDomain,
+      databaseURL: (import.meta.env && import.meta.env.VITE_FB_DB_URL) || HARDCODED_FIREBASE_CONFIG.databaseURL,
+      projectId: (import.meta.env && import.meta.env.VITE_FB_PROJECT_ID) || HARDCODED_FIREBASE_CONFIG.projectId,
+      storageBucket: (import.meta.env && import.meta.env.VITE_FB_STORAGE_BUCKET) || HARDCODED_FIREBASE_CONFIG.storageBucket,
+      messagingSenderId: (import.meta.env && import.meta.env.VITE_FB_MESSAGING_SENDER_ID) || HARDCODED_FIREBASE_CONFIG.messagingSenderId,
+      appId: (import.meta.env && import.meta.env.VITE_FB_APP_ID) || HARDCODED_FIREBASE_CONFIG.appId
     };
 
     // If still no config, show warning state
@@ -618,7 +616,8 @@ const App: React.FC = () => {
   }, [error]);
 
   const checkApiKey = async () => {
-    const envKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
+    // Check safely for env key
+    const envKey = import.meta.env && import.meta.env.VITE_API_KEY;
     if (envKey) { setHasApiKey(true); return; }
     try {
       const win = window as any;
@@ -630,7 +629,7 @@ const App: React.FC = () => {
   };
 
   const handleApiKeySelect = async () => {
-    const envKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
+    const envKey = import.meta.env && import.meta.env.VITE_API_KEY;
     if (envKey) { setHasApiKey(true); return; }
     const win = window as any;
     if (win.aistudio && win.aistudio.openSelectKey) {
@@ -776,7 +775,7 @@ const App: React.FC = () => {
 
     if (!hasApiKey) {
       await handleApiKeySelect();
-      const envKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
+      const envKey = import.meta.env && import.meta.env.VITE_API_KEY;
       if (!envKey) {
         const win = window as any;
         if (!win.aistudio || !(await win.aistudio.hasSelectedApiKey())) return;
