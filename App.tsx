@@ -1279,8 +1279,8 @@ const App: React.FC = () => {
       {/* New padding: px-6 md:px-12 lg:px-20 xl:px-28 */}
       <div className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex flex-col lg:flex-row gap-16 relative z-10 h-auto">
           
-          {/* LEFT TOOL COLUMN: Increased min-h to 85vh to push content down */}
-          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex-none flex flex-col p-5 lg:p-6 min-h-[85vh]">
+          {/* LEFT TOOL COLUMN: Reduced min-h to 80vh */}
+          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex-none flex flex-col p-5 lg:p-6 min-h-[80vh]">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 flex-none">
                    <div className="relative" ref={typeDropdownRef}>
                     <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isGraphicModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/60'}`}><Palette size={12} /> Graphic Design Mode</label>
@@ -1397,8 +1397,8 @@ const App: React.FC = () => {
           </GlassCard>
 
           <div className="w-full lg:flex-1 h-auto flex flex-col gap-6 min-w-0">
-              {/* RESULT AREA: Increased min-h to 65vh */}
-              <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[65vh] shrink-0">
+              {/* RESULT AREA: Reduced min-h to 60vh */}
+              <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[60vh] shrink-0">
                   <div className="absolute top-0 left-0 w-40 h-40 pointer-events-none rounded-tl-2xl border-t-[1px] border-l-[1px] border-[#e2b36e]/40 shadow-[0_0_30px_rgba(226,179,110,0.2)]" style={{maskImage: 'radial-gradient(circle at top left, black 0%, transparent 80%)', WebkitMaskImage: 'radial-gradient(circle at top left, black 0%, transparent 80%)'}}></div>
                   <div className="absolute bottom-0 right-0 w-40 h-40 pointer-events-none rounded-br-2xl border-b-[1px] border-r-[1px] border-[#e2b36e]/40 shadow-[0_0_30px_rgba(226,179,110,0.2)]" style={{maskImage: 'radial-gradient(circle at bottom right, black 0%, transparent 80%)', WebkitMaskImage: 'radial-gradient(circle at bottom right, black 0%, transparent 80%)'}}></div>
                   <div className="absolute inset-6 flex items-center justify-center">
