@@ -10,33 +10,40 @@ const Maintenance: React.FC = () => {
       <div className="absolute inset-0 overflow-hidden pointer-events-none transform-gpu translate-z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-[#125d6e] via-[#005060] to-[#003b46] blur-[120px] opacity-40 will-change-transform"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-[#e2b36e] via-[#b28e67] to-[#005060] blur-[120px] opacity-20 will-change-transform"></div>
+        
+        {/* Added Dark Overlay to match App.tsx */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-black/40 blur-[80px]"></div>
+        
         <div className="absolute inset-0 backdrop-blur-[60px]"></div>
         <div className="absolute inset-0 z-0 opacity-50 mix-blend-overlay" style={{backgroundImage: `repeating-linear-gradient(90deg,rgba(255,255,255,0) 0px,rgba(255,255,255,0.1) 10px,rgba(255,255,255,0.2) 15px,rgba(255,255,255,0.1) 20px,rgba(255,255,255,0) 30px,rgba(0,0,0,0.2) 40px,rgba(0,0,0,0.5) 45px,rgba(0,0,0,0.2) 50px,rgba(0,0,0,0) 60px)`}}></div>
         <div className="absolute inset-0 opacity-[0.07] bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] mix-blend-screen"></div>
         <div className="absolute inset-0 bg-radial-gradient from-transparent via-transparent to-black/80"></div>
       </div>
 
-      {/* HEADER - LOGO TOP LEFT */}
-      <header className="absolute top-0 left-0 w-full p-8 z-20 flex items-center gap-6">
-        <img 
-          src="https://drive.google.com/thumbnail?id=1LgeMCeo2P5G2ex6Vo9ONZMBVgEA9kGGR&sz=w500" 
-          alt="ASTRA Logo"
-          className="h-20 w-auto object-contain drop-shadow-2xl" 
-          draggable={false}
-        />
-        <div className="flex flex-col justify-center">
-            <h2 className="text-5xl font-black text-white tracking-wider leading-[0.9] drop-shadow-md">
-              ASTRA
-            </h2>
-            <span className="text-[10px] text-white/50 uppercase tracking-[0.38em] font-bold ml-1 mt-1">
-              Creatives From The Stars
-            </span>
-        </div>
+      {/* HEADER - IDENTICAL TO APP.TSX */}
+      <header className="absolute top-0 left-0 w-full h-24 flex items-center justify-center z-20 select-none">
+          <div className="w-full max-w-[1920px] mx-auto px-4 lg:px-6 flex items-center gap-3">
+              <div className="relative h-16 w-auto flex-none">
+                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(226,179,110,0.15)_0%,_transparent_70%)] blur-xl"></div>
+                   <img 
+                    src="https://drive.google.com/thumbnail?id=1LgeMCeo2P5G2ex6Vo9ONZMBVgEA9kGGR&sz=w500" 
+                    alt="ASTRA Logo"
+                    className="h-full w-auto object-contain relative z-10 drop-shadow-[0_0_15px_rgba(226,179,110,0.2)]"
+                    onContextMenu={(e) => e.preventDefault()}
+                    draggable={false}
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+              </div>
+              <div className="flex flex-col justify-center">
+                  <h1 className="text-4xl font-black text-white tracking-tighter leading-none uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">ASTRA</h1>
+                  <p className="text-[0.6rem] font-bold tracking-[0.4em] uppercase text-white/50 pl-0.5 leading-none mt-1.5">Creatives from the stars</p>
+              </div>
+          </div>
       </header>
 
       <GlassCard className="p-12 flex flex-col items-center max-w-2xl mx-4 text-center z-10 relative border-[#e2b36e]/20 shadow-2xl backdrop-blur-2xl">
         
-        {/* GLOWING STAR ANIMATION - MOVED ABOVE TEXT */}
+        {/* GLOWING STAR ANIMATION */}
         <div className="relative flex items-center justify-center mb-8">
             <style>{`
                 @keyframes star-heartbeat {
