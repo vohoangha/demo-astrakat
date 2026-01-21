@@ -1279,8 +1279,8 @@ const App: React.FC = () => {
       {/* New padding: px-6 md:px-12 lg:px-20 xl:px-28 */}
       <div className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex flex-col lg:flex-row gap-16 relative z-10 h-auto">
           
-          {/* LEFT TOOL COLUMN: Reduced min-h to 80vh */}
-          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex-none flex flex-col p-5 lg:p-6 min-h-[80vh]">
+          {/* LEFT TOOL COLUMN: Reduced min-h to 65vh */}
+          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex-none flex flex-col p-5 lg:p-6 min-h-[65vh]">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 flex-none">
                    <div className="relative" ref={typeDropdownRef}>
                     <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isGraphicModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/60'}`}><Palette size={12} /> Graphic Design Mode</label>
@@ -1381,7 +1381,7 @@ const App: React.FC = () => {
                             variant={loading ? "rainbow-stop" : "rainbow"}
                             isLoading={loading}
                             disabled={!loading && (!prompt && inputImages.length === 0 && referenceImages.length === 0)}
-                            className="w-[90%] py-3 text-sm xl:text-base font-bold tracking-wide shadow-2xl disabled:opacity-100 disabled:filter-none hover:scale-105 active:scale-95 transition-transform duration-200 whitespace-nowrap"
+                            className="w-[90%] py-2 text-sm xl:text-base font-bold tracking-wide shadow-2xl disabled:opacity-100 disabled:filter-none hover:scale-105 active:scale-95 transition-transform duration-200 whitespace-nowrap"
                          >
                             {loading ? (<><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="mr-2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>STOP</>) : (<>
                                 {/* REPLACED SVG WITH 4-POINTED STAR */}
@@ -1397,8 +1397,8 @@ const App: React.FC = () => {
           </GlassCard>
 
           <div className="w-full lg:flex-1 h-auto flex flex-col gap-6 min-w-0">
-              {/* RESULT AREA: Reduced min-h to 60vh */}
-              <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[60vh] shrink-0">
+              {/* RESULT AREA: Reduced min-h to 45vh */}
+              <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[45vh] shrink-0">
                   <div className="absolute top-0 left-0 w-40 h-40 pointer-events-none rounded-tl-2xl border-t-[1px] border-l-[1px] border-[#e2b36e]/40 shadow-[0_0_30px_rgba(226,179,110,0.2)]" style={{maskImage: 'radial-gradient(circle at top left, black 0%, transparent 80%)', WebkitMaskImage: 'radial-gradient(circle at top left, black 0%, transparent 80%)'}}></div>
                   <div className="absolute bottom-0 right-0 w-40 h-40 pointer-events-none rounded-br-2xl border-b-[1px] border-r-[1px] border-[#e2b36e]/40 shadow-[0_0_30px_rgba(226,179,110,0.2)]" style={{maskImage: 'radial-gradient(circle at bottom right, black 0%, transparent 80%)', WebkitMaskImage: 'radial-gradient(circle at bottom right, black 0%, transparent 80%)'}}></div>
                   <div className="absolute inset-6 flex items-center justify-center">
@@ -1437,7 +1437,7 @@ const App: React.FC = () => {
                   </div>
               </GlassCard>
 
-              <GlassCard className="w-full flex-none h-44 min-h-[11rem] shrink-0 p-4 flex flex-col mb-8 lg:mb-0">
+              <GlassCard className="w-full flex-none h-32 min-h-[8rem] shrink-0 p-4 flex flex-col mb-8 lg:mb-0">
                   <div className="flex-none flex items-center justify-between mb-3">
                      <div className="flex items-center gap-2 text-xs font-semibold text-[#e2b36e]/60 uppercase tracking-widest"><HistoryIcon size={12} /> Recent Generations</div>
                      {history.length > 0 && (<button onClick={clearHistory} className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 hover:underline"><Trash2 size={10} /> Clear All</button>)}
