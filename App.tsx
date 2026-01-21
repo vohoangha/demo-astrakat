@@ -135,6 +135,11 @@ const FullScreenViewer: React.FC<{
   const [editAutoLoading, setEditAutoLoading] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   
+  // NEW: Edit Quality State
+  const [editQuality, setEditQuality] = useState<ImageQuality>(ImageQuality.AUTO);
+  const [isEditQualityDropdownOpen, setIsEditQualityDropdownOpen] = useState(false);
+  const editQualityRef = useRef<HTMLDivElement>(null);
+  
   const dragStartRef = useRef({ x: 0, y: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -156,6 +161,20 @@ const FullScreenViewer: React.FC<{
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose]);
+
+  // Handle Edit Quality Dropdown click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (editQualityRef.current && !editQualityRef.current.contains(event.target as Node)) {
+        setIsEditQualityDropdownOpen(false);
+      }
+    };
+    if(isEditQualityDropdownOpen) {
+        document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isEditQualityDropdownOpen]);
+
 
   // --- CANVAS LOGIC ---
   const initCanvas = () => {
@@ -314,8 +333,8 @@ const FullScreenViewer: React.FC<{
       
       const maskBase64 = maskCanvas.toDataURL('image/png');
 
-      // 2. Call API
-      const editedUrl = await editCreativeAsset(src, maskBase64, editPrompt);
+      // 2. Call API with Quality
+      const editedUrl = await editCreativeAsset(src, maskBase64, editPrompt, editQuality);
       if (onSaveEdit && editedUrl) {
         onSaveEdit(editedUrl);
         // Clean up UI for sequential editing
@@ -649,15 +668,42 @@ const FullScreenViewer: React.FC<{
                           )}
                       </div>
                       
-                      {/* GENERATE BUTTON - STAR ICON */}
-                      <div className="absolute right-3 bottom-3 z-10">
+                      {/* GENERATE BUTTON AND QUALITY DROPDOWN CONTAINER */}
+                      <div className="absolute right-3 bottom-3 z-10 flex items-center gap-2">
+                           {/* QUALITY SELECTION DROPDOWN */}
+                           <div className="relative" ref={editQualityRef}>
+                              <button 
+                                onClick={() => setIsEditQualityDropdownOpen(!isEditQualityDropdownOpen)}
+                                className="h-full px-3 py-2 rounded-lg bg-[#005060] border border-[#e2b36e]/30 text-[#e2b36e] text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-[#003b46] transition-colors shadow-lg"
+                                title="Output Quality"
+                              >
+                                 <Sparkles size={12} />
+                                 {editQuality}
+                                 <ChevronDown size={12} className={`transition-transform duration-200 ${isEditQualityDropdownOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                              
+                              {isEditQualityDropdownOpen && (
+                                <div className="absolute bottom-full right-0 mb-2 w-32 bg-[#003b46]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] overflow-hidden p-1 z-50 animate-in slide-in-from-bottom-2 fade-in duration-200">
+                                   {Object.values(ImageQuality).map((q) => (
+                                     <button 
+                                       key={q} 
+                                       onClick={() => { setEditQuality(q); setIsEditQualityDropdownOpen(false); }} 
+                                       className={`w-full p-2 rounded flex items-center gap-2 text-left text-xs ${editQuality === q ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}
+                                     >
+                                       {q}
+                                     </button>
+                                   ))}
+                                </div>
+                              )}
+                           </div>
+
                            <Button 
                                 onClick={handleEditGenerate} 
                                 isLoading={isEditingLoading}
                                 variant="rainbow"
                                 className="py-2 px-6 text-xs font-bold flex items-center gap-2"
                             >
-                                {/* 4-Pointed Star Icon Inline - Updated to Katinat Gold */}
+                                {/* 4-Pointed Star Icon Inline */}
                                 <svg width="16" height="16" viewBox="0 0 100 100" className="fill-current text-[#e2b36e]">
                                    <path d="M 50 0 C 50 35 60 45 100 50 C 60 55 50 65 50 100 C 50 65 40 55 0 50 C 40 45 50 35 50 0 Z" />
                                 </svg>
@@ -1209,7 +1255,8 @@ const App: React.FC = () => {
             onSaveEdit={(newUrl) => {
                 setPreviewImage(newUrl); 
                 setPreviewSource('generated'); 
-                setGeneratedImages(prev => [...prev, newUrl]); 
+                setGeneratedImages([newUrl]); // Reset main grid to show ONLY the new edited image
+                setImageCount(1); // Ensure grid logic treats it as single image
                 const newRecord: GeneratedImage = {
                     id: Date.now().toString(),
                     url: newUrl,
@@ -1275,12 +1322,11 @@ const App: React.FC = () => {
           </div>
       </header>
 
-      {/* MAIN CONTAINER: Decreased padding to reduce empty space on sides */}
-      {/* New padding: px-6 md:px-12 lg:px-20 xl:px-28 */}
-      <div className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex flex-col lg:flex-row gap-16 relative z-10 h-auto">
+      {/* MAIN CONTAINER: Flex-1 to fill space, items-stretch to equal height columns. min-h pushes footer below fold. */}
+      <div className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex flex-col lg:flex-row gap-16 relative z-10 items-stretch min-h-[calc(100vh-7rem)]">
           
-          {/* LEFT TOOL COLUMN: Reduced min-h to 55vh */}
-          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex-none flex flex-col p-5 lg:p-6 min-h-[55vh]">
+          {/* LEFT TOOL COLUMN: Flex column to stretch vertically */}
+          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex flex-col p-5 lg:p-6 h-full">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 flex-none">
                    <div className="relative" ref={typeDropdownRef}>
                     <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isGraphicModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/60'}`}><Palette size={12} /> Graphic Design Mode</label>
@@ -1302,7 +1348,7 @@ const App: React.FC = () => {
                    </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mb-2 flex-none">
+                <div className="grid grid-cols-3 gap-3 mb-6 flex-none">
                   <div className="relative" ref={ratioDropdownRef}>
                      <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isRatioActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Ratio size={10} /> Ratio</label>
                      <button onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRatioActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate">{isRatioActive && <RatioIcon ratio={selectedAspectRatio} />}<span className="truncate text-sm font-medium">{isRatioActive ? ASPECT_RATIOS.find(r => r.value === selectedAspectRatio)?.label : 'Select'}</span></div><ChevronDown size={14} className={isRatioActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
@@ -1326,7 +1372,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-4 mb-6 mt-1 flex-none">
+                <div className="flex flex-col gap-4 mb-6 mt-4 flex-none">
                    <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-[#e2b36e] bg-[#e2b36e]/10' : 'border-[#e2b36e]/20 bg-[#e2b36e]/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'reference')}>
                     <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-[#e2b36e] flex items-center gap-1.5"><CopyPlus size={12} /> References</label><span className="text-[10px] text-[#e2b36e]/50">{referenceImages.length}/20</span></div>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => refInputRef.current?.click()} disabled={referenceImages.length >= 20} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${referenceImages.length >= 20 ? 'opacity-50 cursor-not-allowed' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}><Plus size={20} /></button><input type="file" ref={refInputRef} className="hidden" onChange={handleRefUpload} accept="image/*" multiple />{referenceImages.map((img, index) => (<div key={`ref-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'reference', index)}><div className="h-full w-full rounded overflow-hidden border border-[#e2b36e]/30 relative"><img src={img} alt={`Ref ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('ref'); }} className="p-1 hover:text-[#e2b36e] text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('ref', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
@@ -1339,7 +1385,8 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col gap-2 mb-6 min-h-[120px] mt-auto">
+                {/* PROMPT AREA - FLEX-1 TO GROW VERTICALLY */}
+                <div className="flex-1 flex flex-col gap-2 mb-6 min-h-[120px]">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-semibold text-[#e2b36e]">Prompt</label>
                     {(inputImages.length > 0 || referenceImages.length > 0) && (
@@ -1371,7 +1418,7 @@ const App: React.FC = () => {
                     </div>
                 </div>
               
-                <div className="flex justify-center flex-none">
+                <div className="flex justify-center flex-none mt-auto">
                     {!hasApiKey ? (
                        <Button onClick={handleApiKeySelect} className="w-full py-4 text-base font-bold tracking-wide"><Key className="w-4 h-4" /> Connect Gemini</Button>
                     ) : (
@@ -1396,9 +1443,10 @@ const App: React.FC = () => {
                 </div>
           </GlassCard>
 
+          {/* RIGHT COLUMN: Flex column to stretch vertically */}
           <div className="w-full lg:flex-1 h-auto flex flex-col gap-6 min-w-0">
-              {/* RESULT AREA: Reduced min-h to 35vh */}
-              <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[35vh] shrink-0">
+              {/* RESULT AREA: FLEX-1 to grow and fill vertical space. Min-height ensures it's never too small. */}
+              <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[400px] shrink-0">
                   <div className="absolute top-0 left-0 w-40 h-40 pointer-events-none rounded-tl-2xl border-t-[1px] border-l-[1px] border-[#e2b36e]/40 shadow-[0_0_30px_rgba(226,179,110,0.2)]" style={{maskImage: 'radial-gradient(circle at top left, black 0%, transparent 80%)', WebkitMaskImage: 'radial-gradient(circle at top left, black 0%, transparent 80%)'}}></div>
                   <div className="absolute bottom-0 right-0 w-40 h-40 pointer-events-none rounded-br-2xl border-b-[1px] border-r-[1px] border-[#e2b36e]/40 shadow-[0_0_30px_rgba(226,179,110,0.2)]" style={{maskImage: 'radial-gradient(circle at bottom right, black 0%, transparent 80%)', WebkitMaskImage: 'radial-gradient(circle at bottom right, black 0%, transparent 80%)'}}></div>
                   <div className="absolute inset-6 flex items-center justify-center">
@@ -1437,7 +1485,7 @@ const App: React.FC = () => {
                   </div>
               </GlassCard>
 
-              {/* HISTORY AREA: Increased height to h-40 */}
+              {/* HISTORY AREA: Fixed height to anchor the bottom. */}
               <GlassCard className="w-full flex-none h-40 min-h-[10rem] shrink-0 p-4 flex flex-col mb-8 lg:mb-0">
                   <div className="flex-none flex items-center justify-between mb-3">
                      <div className="flex items-center gap-2 text-xs font-semibold text-[#e2b36e]/60 uppercase tracking-widest"><HistoryIcon size={12} /> Recent Generations</div>
@@ -1459,8 +1507,8 @@ const App: React.FC = () => {
           </div>
       </div>
         
-      {/* FOOTER: Increased margin top to mt-36 */}
-      <footer className="flex-none w-full text-center py-4 text-[#e2b36e]/40 text-sm font-medium uppercase tracking-widest opacity-80 hover:opacity-100 transition-opacity duration-500 select-none mt-36 pb-8 flex flex-col items-center gap-3">
+      {/* FOOTER: MT-AUTO pushes it to the bottom of flex container. */}
+      <footer className="flex-none w-full text-center py-6 mt-auto text-[#e2b36e]/40 text-sm font-medium uppercase tracking-widest opacity-80 hover:opacity-100 transition-opacity duration-500 select-none flex flex-col items-center gap-3">
           {/* ONLINE USER BADGE */}
           <div className="scale-90 opacity-80 mb-1">
              <OnlineUserCounter />

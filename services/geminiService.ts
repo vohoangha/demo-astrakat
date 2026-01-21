@@ -334,13 +334,45 @@ export const generateCreativeAsset = async (
 export const editCreativeAsset = async (
   originalImageUrl: string,
   maskImageUrl: string | null,
-  prompt: string
+  prompt: string,
+  quality: ImageQuality = ImageQuality.AUTO // Added argument to support quality selection
 ): Promise<string> => {
   const keys = getApiKeys();
   const apiKey = keys[0];
   if (!apiKey) throw new Error("API Key missing");
 
-  // Use Gemini 2.5 Flash Image which supports multimodal input
+  // --- MODEL & QUALITY SELECTION LOGIC ---
+  let effectiveQuality = quality;
+  if (effectiveQuality === ImageQuality.AUTO) {
+      effectiveQuality = ImageQuality.STANDARD;
+  }
+
+  // Model Selection
+  let selectedModel = 'gemini-2.5-flash-image'; 
+  let apiImageSize: string | undefined = undefined; 
+  
+  if (effectiveQuality === ImageQuality.STANDARD) {
+      selectedModel = 'gemini-2.5-flash-image';
+      apiImageSize = undefined; // Flash does not support imageSize
+  } else {
+      // For HD, 2K, 4K -> Use Nano Banana Pro (Gemini 3 Pro Image)
+      selectedModel = 'gemini-3-pro-image-preview';
+      
+      switch (effectiveQuality) {
+          case ImageQuality.HD:
+              apiImageSize = '1K';
+              break;
+          case ImageQuality.Q2K:
+              apiImageSize = '2K';
+              break;
+          case ImageQuality.Q4K:
+              apiImageSize = '4K';
+              break;
+          default:
+              apiImageSize = '1K';
+      }
+  }
+
   const ai = new GoogleGenAI({ apiKey: apiKey });
 
   const parts: any[] = [];
@@ -365,7 +397,12 @@ export const editCreativeAsset = async (
      });
   }
 
-  // 3. Prompt
+  // 3. Prompt & Instructions
+  let qualityInstruction = "";
+  if (effectiveQuality !== ImageQuality.STANDARD) {
+    qualityInstruction = `Resolution Requirement: Render strictly in ${effectiveQuality} resolution. Detailed textures, sharp edges, high fidelity, photorealistic lighting.`;
+  }
+
   // Explicitly instruct the model about the mask usage
   const textPrompt = `
   Task: Image Editing / Inpainting.
@@ -373,16 +410,21 @@ export const editCreativeAsset = async (
   1. The first image is the original.
   2. The second image is a black-and-white mask (White = Area to edit, Black = Protect).
   Instruction: Edit the white area of the mask in the original image based on this prompt: "${prompt}".
+  ${qualityInstruction}
   Ensure seamless blending and realistic lighting.
   `;
   parts.push({ text: textPrompt });
 
   try {
+      const config: any = {};
+      if (apiImageSize && selectedModel !== 'gemini-2.5-flash-image') {
+          config.imageConfig = { imageSize: apiImageSize };
+      }
+
       const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: selectedModel,
           contents: { parts: parts },
-          // Note: Inpainting might follow different parameters in future versions, 
-          // but multimodal instruction following is the current standard method for Flash.
+          config: config
       });
 
       if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
