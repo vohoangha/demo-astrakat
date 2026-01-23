@@ -145,6 +145,10 @@ const FullScreenViewer: React.FC<{
   const [editAutoLoading, setEditAutoLoading] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   
+  // EDIT REFERENCES
+  const [editReferenceImages, setEditReferenceImages] = useState<string[]>([]);
+  const editRefInputRef = useRef<HTMLInputElement>(null);
+
   // SHAPE MANAGEMENT
   const [shapes, setShapes] = useState<ShapeObject[]>([]);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
@@ -165,6 +169,45 @@ const FullScreenViewer: React.FC<{
 
   // ABORT CONTROLLER FOR EDIT
   const editAbortControllerRef = useRef<AbortController | null>(null);
+
+  // PASTE HANDLER FOR EDIT MODE
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+        if (!e.clipboardData) return;
+        const items = e.clipboardData.items;
+        const newImages: string[] = [];
+        let pendingReads = 0;
+
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf("image") !== -1) {
+                const blob = items[i].getAsFile();
+                if (blob) {
+                    pendingReads++;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        if (event.target?.result) {
+                            newImages.push(event.target.result as string);
+                        }
+                        pendingReads--;
+                        if (pendingReads === 0) {
+                            setEditReferenceImages(prev => {
+                                const combined = [...prev, ...newImages];
+                                // Enforce limit 5
+                                return combined.slice(0, 5); 
+                            });
+                        }
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
+        }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isEditMode]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -624,6 +667,41 @@ const FullScreenViewer: React.FC<{
       renderCanvas();
   };
 
+  // --- EDIT REFERENCES HANDLER ---
+  const handleEditRefUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (event.target.files && event.target.files.length > 0) {
+          const files = Array.from(event.target.files);
+          const remainingSlots = 5 - editReferenceImages.length;
+          
+          if (remainingSlots <= 0) {
+              alert("Max 5 reference images allowed in Edit Mode.");
+              return;
+          }
+
+          const fileList = files.slice(0, remainingSlots);
+          const newImages: string[] = [];
+          let processed = 0;
+
+          fileList.forEach(file => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                  if (reader.result) newImages.push(reader.result as string);
+                  processed++;
+                  if (processed === fileList.length) {
+                      setEditReferenceImages(prev => [...prev, ...newImages]);
+                  }
+              };
+              reader.readAsDataURL(file as any);
+          });
+          
+          if (editRefInputRef.current) editRefInputRef.current.value = '';
+      }
+  };
+
+  const removeEditRefImage = (index: number) => {
+      setEditReferenceImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   // --- EDIT API LOGIC ---
   const handleEditGenerate = async () => {
     if (!editPrompt.trim()) return;
@@ -669,8 +747,8 @@ const FullScreenViewer: React.FC<{
       
       const maskBase64 = maskCanvas.toDataURL('image/png');
 
-      // 2. Call API with Quality
-      const editedUrl = await editCreativeAsset(src, maskBase64, editPrompt, ImageQuality.AUTO, controller.signal);
+      // 2. Call API with Quality & References
+      const editedUrl = await editCreativeAsset(src, maskBase64, editPrompt, ImageQuality.AUTO, controller.signal, editReferenceImages);
       
       if (controller.signal.aborted) return;
 
@@ -678,6 +756,7 @@ const FullScreenViewer: React.FC<{
         onSaveEdit(editedUrl);
         clearMask(); 
         setEditPrompt(''); 
+        // Note: We deliberately do NOT clear editReferenceImages here, allowing users to reuse them.
       }
     } catch (e: any) {
       if (e.name === 'AbortError' || e.message === 'Aborted') return;
@@ -914,14 +993,59 @@ const FullScreenViewer: React.FC<{
          ) : (
              /* EDIT MODE PROMPT BAR */
              <GlassCard className="p-0 flex flex-col gap-0 w-[800px] max-w-[95vw] animate-in slide-in-from-bottom fade-in duration-300 relative overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+                  {/* EDIT MODE REFERENCES UI - NEW ADDITION */}
+                  <div className="w-full px-1 pt-1 pb-1">
+                      <div className="border border-dashed border-[#e2b36e]/20 bg-[#e2b36e]/5 rounded-xl p-2.5 flex flex-col gap-2">
+                          <div className="flex justify-between items-center px-1">
+                              <label className="text-[10px] font-bold text-[#e2b36e]/60 flex items-center gap-1.5 uppercase tracking-wider">
+                                  <CopyPlus size={10} /> References
+                              </label>
+                              <span className="text-[10px] text-[#e2b36e]/40 font-mono">{editReferenceImages.length}/5</span>
+                          </div>
+                          
+                          <div className="flex gap-2 overflow-x-auto custom-scrollbar p-2">
+                              <button 
+                                onClick={() => editRefInputRef.current?.click()} 
+                                disabled={editReferenceImages.length >= 5}
+                                className={`h-12 w-12 flex-none rounded-lg border border-dashed flex items-center justify-center transition-all ${editReferenceImages.length >= 5 ? 'opacity-50 cursor-not-allowed border-[#e2b36e]/20 text-[#e2b36e]/20' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                title="Add Reference Image or Paste (Ctrl+V)"
+                              >
+                                  <Plus size={18} />
+                              </button>
+                              <input type="file" ref={editRefInputRef} className="hidden" onChange={handleEditRefUpload} accept="image/*" multiple />
+                              
+                              {editReferenceImages.length === 0 && (
+                                  <div className="flex items-center text-[10px] text-[#e2b36e]/30 italic select-none px-2">
+                                      Upload or Paste (Ctrl+V) images here to guide the AI
+                                  </div>
+                              )}
+
+                              {editReferenceImages.map((img, idx) => (
+                                  <div key={idx} className="relative h-12 w-12 flex-none group">
+                                      <img src={img} alt={`Ref ${idx}`} className="h-full w-full object-cover rounded-lg border border-[#e2b36e]/20" />
+                                      <button 
+                                        onClick={() => removeEditRefImage(idx)} 
+                                        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm scale-75 hover:scale-100 z-10"
+                                      >
+                                          <X size={10} />
+                                      </button>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  </div>
+
                   <div className="relative w-full h-32">
-                      <textarea 
-                        value={editPrompt}
-                        onChange={(e) => setEditPrompt(e.target.value)}
-                        placeholder="Describe what to change in the highlighted area..."
-                        className="w-full h-full bg-[#e2b36e]/5 hover:bg-[#e2b36e]/10 focus:bg-[#e2b36e]/10 transition-colors border-none rounded-t-xl px-4 py-3 text-sm text-[#e2b36e] placeholder-[#e2b36e]/40 focus:outline-none resize-none custom-scrollbar"
-                        onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditGenerate(); }}}
-                      />
+                      <div className="relative flex-1 bg-[#e2b36e]/5 hover:bg-[#e2b36e]/10 focus-within:bg-[#e2b36e]/10 transition-colors h-full">
+                        <textarea 
+                            value={editPrompt}
+                            onChange={(e) => setEditPrompt(e.target.value)}
+                            placeholder="Describe what to change in the highlighted area..."
+                            className="w-full h-full bg-transparent border-none px-4 py-3 text-sm text-[#e2b36e] placeholder-[#e2b36e]/40 focus:outline-none resize-none custom-scrollbar pb-12"
+                            onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditGenerate(); }}}
+                        />
+                      </div>
+                      
                       {/* CONDITIONAL BUTTONS: AUTO or ENHANCE */}
                       <div className="absolute left-3 bottom-3 flex gap-2 z-10">
                           {!editPrompt.trim() ? (

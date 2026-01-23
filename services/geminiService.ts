@@ -336,7 +336,8 @@ export const editCreativeAsset = async (
   maskImageUrl: string | null,
   prompt: string,
   quality: ImageQuality = ImageQuality.AUTO, // Added argument to support quality selection
-  signal?: AbortSignal // Added Signal for Stop
+  signal?: AbortSignal, // Added Signal for Stop
+  referenceImages: string[] = [] // Added Reference Images for Editing
 ): Promise<string> => {
   const keys = getApiKeys();
   const apiKey = keys[0];
@@ -385,19 +386,36 @@ export const editCreativeAsset = async (
      });
   }
 
-  // 3. Prompt & Instructions
+  // 3. Reference Images (If provided) - Passed as subsequent images
+  if (referenceImages && referenceImages.length > 0) {
+    referenceImages.forEach(refImg => {
+        const { mimeType: refMime, data: refData } = parseBase64Image(refImg);
+        parts.push({
+            inlineData: {
+                mimeType: refMime,
+                data: refData
+            }
+        });
+    });
+  }
+
+  // 4. Prompt & Instructions
   let qualityInstruction = "";
   if (effectiveQuality !== ImageQuality.STANDARD && effectiveQuality !== ImageQuality.AUTO) {
     qualityInstruction = `Resolution Requirement: Render strictly in ${effectiveQuality} resolution. Detailed textures, sharp edges, high fidelity, photorealistic lighting.`;
   }
 
+  let refInstruction = "";
+  if (referenceImages && referenceImages.length > 0) {
+      refInstruction = `Additional input: ${referenceImages.length} reference image(s) have been provided to guide the style, color, and texture of the edit.`;
+  }
+
   // Explicitly instruct the model about the mask usage
   const textPrompt = `
   Task: Image Editing / Inpainting.
-  Input: Two images provided. 
-  1. The first image is the original.
-  2. The second image is a black-and-white mask (White = Area to edit, Black = Protect).
+  Input: Original image, Mask image (White=Edit, Black=Protect)${referenceImages.length > 0 ? ', and Reference Images' : ''}.
   Instruction: Edit the white area of the mask in the original image based on this prompt: "${prompt}".
+  ${refInstruction}
   ${qualityInstruction}
   Ensure seamless blending and realistic lighting.
   `;
