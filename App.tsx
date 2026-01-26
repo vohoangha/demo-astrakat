@@ -1,9 +1,10 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, onDisconnect, set, push, serverTimestamp } from 'firebase/database';
 import { GlassCard } from './components/GlassCard';
 import { Button } from './components/Button';
-import { MediaType, ASPECT_RATIOS, GeneratedImage, ArchitectureStyle, ImageQuality } from './types';
+import { MediaType, ASPECT_RATIOS, GeneratedImage, ArchitectureStyle, ImageQuality, RenderEngine, LightingSetting } from './types';
 import { generateCreativeAsset, generatePromptFromImage, enhanceUserPrompt, editCreativeAsset } from './services/geminiService';
 import { 
   Wand2, 
@@ -42,7 +43,9 @@ import {
   Check,
   Edit3,
   Send,
-  Hand // Added Hand icon
+  Hand,
+  Cpu,
+  Sun
 } from 'lucide-react';
 
 // ==========================================
@@ -1195,6 +1198,10 @@ const App: React.FC = () => {
   const [selectedQuality, setSelectedQuality] = useState<ImageQuality>(ImageQuality.AUTO);
   const [isQualitySet, setIsQualitySet] = useState(false); 
 
+  // --- NEW ARCH STATES ---
+  const [selectedRenderEngine, setSelectedRenderEngine] = useState<RenderEngine>(RenderEngine.DEFAULT);
+  const [selectedLighting, setSelectedLighting] = useState<LightingSetting>(LightingSetting.DEFAULT);
+
   // --- AUTO-SELECT STATE TRACKING ---
   const [isRatioAuto, setIsRatioAuto] = useState(false);
   const [isCountAuto, setIsCountAuto] = useState(false);
@@ -1222,6 +1229,9 @@ const App: React.FC = () => {
   const ratioDropdownRef = useRef<HTMLDivElement>(null);
   const countDropdownRef = useRef<HTMLDivElement>(null);
   const qualityDropdownRef = useRef<HTMLDivElement>(null);
+  const renderDropdownRef = useRef<HTMLDivElement>(null);
+  const lightingDropdownRef = useRef<HTMLDivElement>(null);
+
   const inputInputRef = useRef<HTMLInputElement>(null);
   const refInputRef = useRef<HTMLInputElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -1232,6 +1242,8 @@ const App: React.FC = () => {
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false);
   const [isCountDropdownOpen, setIsCountDropdownOpen] = useState(false);
   const [isQualityDropdownOpen, setIsQualityDropdownOpen] = useState(false);
+  const [isRenderDropdownOpen, setIsRenderDropdownOpen] = useState(false);
+  const [isLightingDropdownOpen, setIsLightingDropdownOpen] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const [draggingItem, setDraggingItem] = useState<any | null>(null);
@@ -1258,6 +1270,8 @@ const App: React.FC = () => {
       if (ratioDropdownRef.current && !ratioDropdownRef.current.contains(event.target as Node)) setIsRatioDropdownOpen(false);
       if (countDropdownRef.current && !countDropdownRef.current.contains(event.target as Node)) setIsCountDropdownOpen(false);
       if (qualityDropdownRef.current && !qualityDropdownRef.current.contains(event.target as Node)) setIsQualityDropdownOpen(false);
+      if (renderDropdownRef.current && !renderDropdownRef.current.contains(event.target as Node)) setIsRenderDropdownOpen(false);
+      if (lightingDropdownRef.current && !lightingDropdownRef.current.contains(event.target as Node)) setIsLightingDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -1457,7 +1471,8 @@ const App: React.FC = () => {
     try {
       let typeForPrompt = selectedType;
       if (selectedType === MediaType.NONE && selectedArchStyle === ArchitectureStyle.NONE) typeForPrompt = MediaType.STANDARD;
-      const suggestion = await generatePromptFromImage(allContextImages, typeForPrompt, selectedArchStyle);
+      // Pass the new arch settings
+      const suggestion = await generatePromptFromImage(allContextImages, typeForPrompt, selectedArchStyle, selectedRenderEngine, selectedLighting);
       setPrompt(suggestion);
     } catch (err) { setError("Could not generate auto-prompt. Check API key."); } 
     finally { setIsAutoPrompting(false); }
@@ -1468,7 +1483,8 @@ const App: React.FC = () => {
     if (!hasApiKey) { await handleApiKeySelect(); if (!hasApiKey) return; }
     setIsEnhancing(true);
     try {
-      const enhanced = await enhanceUserPrompt(prompt, selectedType, selectedArchStyle);
+      // Pass the new arch settings
+      const enhanced = await enhanceUserPrompt(prompt, selectedType, selectedArchStyle, selectedRenderEngine, selectedLighting);
       setPrompt(enhanced);
     } catch (err) { setError("Could not enhance prompt."); } 
     finally { setIsEnhancing(false); }
@@ -1548,12 +1564,24 @@ const App: React.FC = () => {
     setGeneratedImages(Array(effectiveCount).fill(null));
 
     try {
-      const imageUrls = await generateCreativeAsset(prompt, selectedType, effectiveAspectRatio, effectiveCount, inputImages, referenceImages, selectedArchStyle, selectedQuality, controller.signal, (url, index) => {
-          setGeneratedImages(prev => {
-              const newArr = [...prev];
-              newArr[index] = url;
-              return newArr;
-          });
+      const imageUrls = await generateCreativeAsset(
+          prompt, 
+          selectedType, 
+          effectiveAspectRatio, 
+          effectiveCount, 
+          inputImages, 
+          referenceImages, 
+          selectedArchStyle, 
+          selectedQuality, 
+          selectedRenderEngine, // Pass engine
+          selectedLighting, // Pass lighting
+          controller.signal, 
+          (url, index) => {
+            setGeneratedImages(prev => {
+                const newArr = [...prev];
+                newArr[index] = url;
+                return newArr;
+            });
       });
       if (controller.signal.aborted) return;
       setGeneratedImages(imageUrls);
@@ -1619,6 +1647,8 @@ const App: React.FC = () => {
   const isRatioActive = selectedAspectRatio !== '';
   const isCountActive = imageCount !== 0;
   const isQualityActive = isQualitySet; 
+  const isRenderEngineActive = selectedRenderEngine !== RenderEngine.DEFAULT;
+  const isLightingActive = selectedLighting !== LightingSetting.DEFAULT;
 
   // Updated Active Style to Teal/Gold
   const activeButtonStyle = "bg-[#103742]/30 border-[#e2b36e] text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] ring-1 ring-[#e2b36e]/40";
@@ -1768,16 +1798,48 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
+                {/* --- NEW ENGINE & LIGHTING SETTINGS (VISIBLE ONLY IN ARCH MODE) --- */}
+                {isArchModeActive && (
+                  <div className="grid grid-cols-2 gap-3 mb-6 flex-none animate-in fade-in slide-in-from-top-4 duration-300">
+                      <div className="relative" ref={renderDropdownRef}>
+                         <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isRenderEngineActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Cpu size={10} /> Render Engine</label>
+                         <button onClick={() => setIsRenderDropdownOpen(!isRenderDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRenderEngineActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedRenderEngine}</span></div><ChevronDown size={14} className={isRenderEngineActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                          {isRenderDropdownOpen && (
+                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 max-h-60 overflow-y-auto">
+                                {Object.values(RenderEngine).map((eng) => (
+                                    <button key={eng} onClick={() => { setSelectedRenderEngine(eng); setIsRenderDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedRenderEngine === eng ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}>
+                                        <span className="truncate">{eng}</span>
+                                    </button>
+                                ))}
+                            </div>
+                          )}
+                      </div>
+                      <div className="relative" ref={lightingDropdownRef}>
+                         <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isLightingActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Sun size={10} /> Lighting</label>
+                         <button onClick={() => setIsLightingDropdownOpen(!isLightingDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isLightingActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedLighting}</span></div><ChevronDown size={14} className={isLightingActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                          {isLightingDropdownOpen && (
+                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 max-h-60 overflow-y-auto">
+                                {Object.values(LightingSetting).map((l) => (
+                                    <button key={l} onClick={() => { setSelectedLighting(l); setIsLightingDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedLighting === l ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}>
+                                        <span className="truncate">{l}</span>
+                                    </button>
+                                ))}
+                            </div>
+                          )}
+                      </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-4 mb-6 mt-4 flex-none">
                    <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-[#e2b36e] bg-[#e2b36e]/10' : 'border-[#e2b36e]/20 bg-[#e2b36e]/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'reference')}>
                     <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-[#e2b36e] flex items-center gap-1.5"><CopyPlus size={12} /> References</label><span className="text-[10px] text-[#e2b36e]/50">{referenceImages.length}/20</span></div>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => refInputRef.current?.click()} disabled={referenceImages.length >= 20} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${referenceImages.length >= 20 ? 'opacity-50 cursor-not-allowed' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}><Plus size={20} /></button><input type="file" ref={refInputRef} className="hidden" onChange={handleRefUpload} accept="image/*" multiple />{referenceImages.map((img, index) => (<div key={`ref-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'reference', index)}><div className="h-full w-full rounded overflow-hidden border border-[#e2b36e]/30 relative"><img src={img} alt={`Ref ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('ref'); }} className="p-1 hover:text-[#e2b36e] text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('ref', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
-                    <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Drag Input Images here to use as Reference</div>
+                    <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Upload images here to use as Reference</div>
                   </div>
                   <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-[#e2b36e] bg-[#e2b36e]/10' : 'border-[#e2b36e]/20 bg-[#e2b36e]/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'input')}>
                     <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-[#e2b36e] flex items-center gap-1.5"><ImageIcon size={12} /> {isArchModeActive ? 'Input Sketch' : 'Input Image'}</label><span className="text-[10px] text-[#e2b36e]/50">{inputImages.length}/10</span></div>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => inputInputRef.current?.click()} disabled={inputImages.length >= 10} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${inputImages.length >= 10 ? 'opacity-50 cursor-not-allowed' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}><Plus size={20} /></button><input type="file" ref={inputInputRef} className="hidden" onChange={handleInputUpload} accept="image/*" multiple />{inputImages.map((img, index) => (<div key={`input-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'input', index)}><div className="h-full w-full rounded overflow-hidden border border-[#e2b36e]/30 relative"><img src={img} alt={`Input ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('input'); }} className="p-1 hover:text-[#e2b36e] text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('input', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
-                    <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Drag Refs here to use as Base</div>
+                    <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Upload images here to use as Base</div>
                   </div>
                 </div>
 

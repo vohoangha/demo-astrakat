@@ -37,6 +37,37 @@ export enum ImageQuality {
   Q4K = '4K'
 }
 
+export enum RenderEngine {
+  DEFAULT = 'Default',
+  BLENDER_CYCLES = 'Blender Cycles',
+  CORONA = 'Corona Renderer',
+  D5 = 'D5 Render',
+  ENSCAPE = 'Enscape',
+  LUMION = 'Lumion',
+  MARMOSET = 'Marmoset Toolbag',
+  MAXWELL = 'Maxwell Render',
+  OCTANE = 'Octane Render',
+  REDSHIFT = 'Redshift',
+  TWINMOTION = 'Twinmotion',
+  UNREAL = 'Unreal Engine 5',
+  VRAY = 'V-Ray'
+}
+
+export enum LightingSetting {
+  DEFAULT = 'Default',
+  BLUE_HOUR = 'Blue Hour',
+  CINEMATIC = 'Cinematic',
+  GOLDEN_HOUR = 'Golden Hour',
+  MOODY = 'Moody',
+  NEON = 'Neon/Cyberpunk',
+  NIGHT = 'Night',
+  NOON = 'Noon (Sunny)',
+  OVERCAST = 'Overcast',
+  STUDIO = 'Studio',
+  SUNRISE = 'Sunrise',
+  SUNSET = 'Sunset'
+}
+
 export interface GeneratedImage {
   id: string;
   url: string;

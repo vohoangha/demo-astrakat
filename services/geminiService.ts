@@ -1,5 +1,6 @@
+
 import { GoogleGenAI } from "@google/genai";
-import { MediaType, ArchitectureStyle, ImageQuality } from "../types";
+import { MediaType, ArchitectureStyle, ImageQuality, RenderEngine, LightingSetting } from "../types";
 
 // Helper function to get specific prompt details for each graphic design type
 const getDesignContext = (type: MediaType): string => {
@@ -82,6 +83,8 @@ export const generateCreativeAsset = async (
   referenceImages: string[] = [], 
   archStyle: ArchitectureStyle = ArchitectureStyle.NONE,
   quality: ImageQuality = ImageQuality.AUTO,
+  renderEngine: RenderEngine = RenderEngine.DEFAULT,
+  lighting: LightingSetting = LightingSetting.DEFAULT,
   signal?: AbortSignal,
   onImageReady?: (url: string, index: number) => void // callback for incremental loading
 ): Promise<string[]> => {
@@ -169,11 +172,24 @@ export const generateCreativeAsset = async (
         ? "Follow the User Note strictly for architectural aesthetics"
         : `Apply ${archStyle} aesthetics`;
 
+    // Construct Engine & Lighting Instructions
+    let enginePrompt = "";
+    if (renderEngine !== RenderEngine.DEFAULT) {
+        enginePrompt = `Render Engine Simulation: Mimic the distinct rendering characteristics of ${renderEngine}. Focus on the specific global illumination, material shaders, and camera effects typical of this software.`;
+    }
+
+    let lightingPrompt = "";
+    if (lighting !== LightingSetting.DEFAULT) {
+        lightingPrompt = `Lighting Condition: ${lighting}. Strictly apply this lighting atmosphere to the scene.`;
+    }
+
     enhancedPrompt = `
     Task: Architectural Visualization / Rendering.
     ${imageInstruction}
     Goal: Render a photorealistic ${styleGoal} architectural image.
     Style Details: ${styleDetails}. High-end material texturing, realistic lighting, ray-tracing quality.
+    ${enginePrompt}
+    ${lightingPrompt}
     User Note: ${prompt}.
     ${qualityInstruction}
     Composition: Ensure the output fits a ${aspectRatio} aspect ratio.
@@ -350,16 +366,20 @@ export const editCreativeAsset = async (
   // Flash model is often too weak for complex inpainting. 
   // We default to Pro for all edit tasks.
   let selectedModel = 'gemini-3-pro-image-preview'; 
-  let apiImageSize = '1K'; // Default to 1K for Pro model
   
-  // Map specific qualities if requested, otherwise default to 1K (Standard/Auto)
+  // Default to 2K (High Quality) even if AUTO is selected to ensure sharpness
+  let apiImageSize = '2K'; 
+  
+  // Map specific qualities if requested
   if (effectiveQuality === ImageQuality.Q4K) {
       apiImageSize = '4K';
   } else if (effectiveQuality === ImageQuality.Q2K) {
       apiImageSize = '2K';
-  } else {
-      // Auto, Standard, HD -> 1K
+  } else if (effectiveQuality === ImageQuality.HD || effectiveQuality === ImageQuality.STANDARD) {
       apiImageSize = '1K';
+  } else {
+      // AUTO -> 2K (Upgrade from 1K default to ensure highest quality)
+      apiImageSize = '2K';
   }
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -401,8 +421,8 @@ export const editCreativeAsset = async (
 
   // 4. Prompt & Instructions
   let qualityInstruction = "";
-  if (effectiveQuality !== ImageQuality.STANDARD && effectiveQuality !== ImageQuality.AUTO) {
-    qualityInstruction = `Resolution Requirement: Render strictly in ${effectiveQuality} resolution. Detailed textures, sharp edges, high fidelity, photorealistic lighting.`;
+  if (effectiveQuality === ImageQuality.AUTO || effectiveQuality === ImageQuality.Q2K || effectiveQuality === ImageQuality.Q4K) {
+    qualityInstruction = `Resolution Requirement: Render in high resolution (2K/4K) strictly. Texture details must be sharp, photorealistic, and match the original image. Zero blur. High fidelity.`;
   }
 
   let refInstruction = "";
@@ -456,7 +476,9 @@ export const editCreativeAsset = async (
 export const generatePromptFromImage = async (
   images: string[],
   type: MediaType,
-  archStyle: ArchitectureStyle = ArchitectureStyle.NONE
+  archStyle: ArchitectureStyle = ArchitectureStyle.NONE,
+  renderEngine: RenderEngine = RenderEngine.DEFAULT,
+  lighting: LightingSetting = LightingSetting.DEFAULT
 ): Promise<string> => {
   const keys = getApiKeys();
   const apiKey = keys[0]; // Use first key for text tasks
@@ -480,10 +502,18 @@ export const generatePromptFromImage = async (
 
   if (archStyle !== ArchitectureStyle.NONE) {
     const styleText = archStyle === ArchitectureStyle.OTHERS ? "custom" : `"${archStyle}"`;
+    let engineText = "";
+    if (renderEngine !== RenderEngine.DEFAULT) engineText = `Simulate the rendering style of ${renderEngine}.`;
+    
+    let lightingText = "";
+    if (lighting !== LightingSetting.DEFAULT) lightingText = `The lighting should be ${lighting}.`;
+
     promptRequest = `
       You are an expert Architectural Consultant. 
       Analyze the provided ${images.length} image(s) as a reference for geometry, layout, or atmosphere.
       The user wants to create a Photorealistic Architectural Render in the ${styleText} style.
+      ${engineText}
+      ${lightingText}
       Write a precise, professional prompt (approx 40-60 words) describing the scene, materials, lighting, and furniture.
       Return ONLY the prompt text.
     `;
@@ -510,7 +540,9 @@ export const generatePromptFromImage = async (
 export const enhanceUserPrompt = async (
   currentPrompt: string,
   type: MediaType,
-  archStyle: ArchitectureStyle
+  archStyle: ArchitectureStyle,
+  renderEngine: RenderEngine = RenderEngine.DEFAULT,
+  lighting: LightingSetting = LightingSetting.DEFAULT
 ): Promise<string> => {
   const keys = getApiKeys();
   const apiKey = keys[0]; // Use first key for text tasks
@@ -521,10 +553,13 @@ export const enhanceUserPrompt = async (
   let instruction = '';
   if (archStyle !== ArchitectureStyle.NONE) {
     const context = archStyle === ArchitectureStyle.OTHERS ? "architectural render" : `${archStyle} style render`;
+    const engineText = renderEngine !== RenderEngine.DEFAULT ? `, rendered in ${renderEngine}` : '';
+    const lightingText = lighting !== LightingSetting.DEFAULT ? `, with ${lighting} lighting` : '';
+
     instruction = `
       You are a specialized Architectural Visualization Prompt Engineer.
       Improve the user's prompt: "${currentPrompt}".
-      Context: Creating a ${context}.
+      Context: Creating a ${context}${engineText}${lightingText}.
       Task: Expand the prompt to include details about lighting, materials, and atmosphere. 
       Keep it concise (under 80 words). Output ONLY the improved prompt.
     `;
