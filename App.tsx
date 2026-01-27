@@ -1232,46 +1232,69 @@ const AILoader: React.FC<{ progress: number; small?: boolean }> = ({ progress, s
 const ScrollableText: React.FC<{ text: string, className?: string }> = ({ text, className = "" }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
-  const [offset, setOffset] = useState(0);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [duration, setDuration] = useState(0);
 
-  const handleMouseEnter = () => {
-    if (containerRef.current && textRef.current) {
-      const containerWidth = containerRef.current.clientWidth;
-      const textWidth = textRef.current.scrollWidth;
-      const diff = textWidth - containerWidth;
-      
-      if (diff > 0) {
-        setOffset(diff + 10); // Scroll full difference + padding
-        // Speed: ~30-50 pixels per second roughly
-        setDuration(Math.max(2, diff * 0.05)); 
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (containerRef.current && textRef.current) {
+        const containerWidth = containerRef.current.clientWidth;
+        const textWidth = textRef.current.scrollWidth;
+        
+        // Add a small threshold (e.g. 1px) to avoid rounding jitter
+        if (textWidth > containerWidth + 1) {
+            setIsOverflowing(true);
+            // Speed calculation: Faster speed (approx 100px/s)
+            // Example: 200px width -> 2s duration
+            setDuration(textWidth / 100); 
+        } else {
+            setIsOverflowing(false);
+        }
       }
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setOffset(0);
-    setDuration(0.5); // Smooth return
-  };
+    };
+    
+    // Initial check
+    checkOverflow();
+    
+    window.addEventListener('resize', checkOverflow);
+    return () => window.removeEventListener('resize', checkOverflow);
+  }, [text]);
 
   return (
     <div 
       ref={containerRef}
-      className={`overflow-hidden whitespace-nowrap min-w-0 ${className}`} 
-      onMouseEnter={handleMouseEnter} 
-      onMouseLeave={handleMouseLeave}
+      className={`relative overflow-hidden whitespace-nowrap min-w-0 ${className}`} 
+      onMouseEnter={() => setIsHovered(true)} 
+      onMouseLeave={() => setIsHovered(false)}
       title={text}
     >
-      <span 
-        ref={textRef}
-        className="inline-block transition-transform ease-linear will-change-transform"
-        style={{ 
-          transform: `translateX(-${offset}px)`, 
-          transitionDuration: `${duration}s` 
-        }}
-      >
-        {text}
-      </span>
+        {/* Helper style for marquee animation */}
+        <style>{`
+            @keyframes marquee {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
+            }
+        `}</style>
+
+      {isOverflowing ? (
+         <div 
+            className="inline-flex will-change-transform"
+            style={{
+                // Infinite loop: moves from 0 to -50% (exactly one text copy length)
+                // then snaps back to 0 seamlessly
+                animation: isHovered ? `marquee ${Math.max(1.5, duration)}s linear infinite` : 'none',
+                width: 'max-content' // Ensures the div wraps both spans
+            }}
+         >
+           {/* Original Text */}
+           <span ref={textRef} className="pr-8">{text}</span>
+           {/* Duplicate Text for Loop */}
+           <span className="pr-8">{text}</span>
+         </div>
+      ) : (
+        <span ref={textRef} className="truncate block">{text}</span>
+      )}
     </div>
   );
 };
