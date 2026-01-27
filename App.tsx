@@ -1,5 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, onValue, onDisconnect, set, push, serverTimestamp } from 'firebase/database';
 import { GlassCard } from './components/GlassCard';
 import { Button } from './components/Button';
 import { MediaType, ASPECT_RATIOS, GeneratedImage, ArchitectureStyle, ImageQuality, RenderEngine, LightingSetting } from './types';
@@ -44,26 +46,50 @@ import {
   Hand,
   Cpu,
   Sun,
-  ChevronRight
+  ChevronRight,
+  ChevronUp
 } from 'lucide-react';
+
+// ==========================================
+// *** CẤU HÌNH FIREBASE REALTIME COUNTER ***
+const firebaseConfig = {
+  apiKey: "AIzaSyAEE8kkji3B4h2DQ2cO1tq4G6HjmIOLdOg",
+  authDomain: "astra-kat-couter.firebaseapp.com",
+  databaseURL: "https://astra-kat-couter-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "astra-kat-couter",
+  storageBucket: "astra-kat-couter.firebasestorage.app",
+  messagingSenderId: "46973775395",
+  appId: "1:46973775395:web:e6b6859b97b63232274b96"
+};
+
+// Khởi tạo Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
 // ==========================================
 // *** CẤU HÌNH DRIVE (QUAN TRỌNG) ***
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyKC7UigaUPX3kzhR3JSVA1-vxjC1wGlyDoCCELiE5f_xmmSu3-VTPD41tjPIUIRabNNA/exec'; 
 // ==========================================
 
+
+// --- SECURITY HELPER ---
+const verifyAccess = async (key: string): Promise<boolean> => {
+  if (!key) return false;
+  return key.trim() === 'KAT777';
+};
+
 // --- ARCHITECTURE STYLE GROUPS DEFINITION (SORTED A-Z) ---
 const ARCH_STYLE_GROUPS = {
   "Modern": [
     ArchitectureStyle.BAUHAUS,
     ArchitectureStyle.JAPANDI,
-    ArchitectureStyle.LUXURY, // Moved to Modern
+    ArchitectureStyle.LUXURY,
     ArchitectureStyle.MID_CENTURY,
     ArchitectureStyle.MINIMALIST,
     ArchitectureStyle.MODERN,
     ArchitectureStyle.SCANDINAVIAN,
     ArchitectureStyle.WABI_SABI
-  ],
+  ].sort(),
   "Classic": [
     ArchitectureStyle.ART_DECO,
     ArchitectureStyle.INDOCHINE,
@@ -71,73 +97,142 @@ const ARCH_STYLE_GROUPS = {
     ArchitectureStyle.MOROCCAN,
     ArchitectureStyle.NEOCLASSIC,
     ArchitectureStyle.VICTORIAN
-  ],
+  ].sort(),
   "Rustic & Nature": [
     ArchitectureStyle.BRUTALIST,
     ArchitectureStyle.COTTAGECORE,
     ArchitectureStyle.FARMHOUSE,
     ArchitectureStyle.FRAME_HOUSE,
     ArchitectureStyle.TROPICAL
-  ],
+  ].sort(),
   "Industrial & Future": [
     ArchitectureStyle.CYBERPUNK,
     ArchitectureStyle.FUTURISTIC,
     ArchitectureStyle.INDUSTRIAL
-  ]
+  ].sort()
 };
 
-// --- RENDER ENGINE GROUPS DEFINITION (SORTED A-Z) ---
-const ENGINE_GROUPS = {
-  "Interior": [
-    RenderEngine.BLENDER,
-    RenderEngine.CORONA,
-    RenderEngine.MAXWELL,
-    RenderEngine.OCTANE,
-    RenderEngine.REDSHIFT,
-    RenderEngine.VRAY
-  ],
-  "Architecture": [
-    RenderEngine.D5,
-    RenderEngine.ENSCAPE,
-    RenderEngine.LUMION,
-    RenderEngine.MARMOSET,
-    RenderEngine.TWINMOTION,
-    RenderEngine.UNREAL
-  ]
+// --- DATA CONSTANTS FOR NESTED DROPDOWNS (Sorted A-Z) ---
+const ENGINE_CATEGORIES = {
+    "Interior": [
+        RenderEngine.BLENDER_CYCLES,
+        RenderEngine.CORONA,
+        RenderEngine.MARMOSET,
+        RenderEngine.MAXWELL,
+        RenderEngine.OCTANE,
+        RenderEngine.UNREAL,
+        RenderEngine.VRAY
+    ].sort(),
+    "Architecture": [
+        RenderEngine.D5,
+        RenderEngine.ENSCAPE,
+        RenderEngine.LUMION,
+        RenderEngine.REDSHIFT,
+        RenderEngine.TWINMOTION
+    ].sort()
 };
 
-// --- LIGHTING GROUPS DEFINITION (SORTED A-Z) ---
-const LIGHTING_GROUPS = {
-  "Time of Day": [
-    LightingSetting.BLUE_HOUR,
-    LightingSetting.GOLDEN_HOUR,
-    LightingSetting.NIGHT,
-    LightingSetting.NOON,
-    LightingSetting.SUNNY_DAY,
-    LightingSetting.SUNRISE
-  ],
-  "Weather & Environment": [
-    LightingSetting.FOGGY,
-    LightingSetting.OVERCAST,
-    LightingSetting.RAINY,
-    LightingSetting.SNOWY
-  ],
-  "Artificial & Indoor": [
-    LightingSetting.NEON,
-    LightingSetting.STUDIO,
-    LightingSetting.WARM_INTERIOR
-  ],
-  "Mood & Artistic": [
-    LightingSetting.BIOLUMINESCENT,
-    LightingSetting.CINEMATIC,
-    LightingSetting.MOODY
-  ]
+const LIGHTING_CATEGORIES = {
+    "Time of Day": [
+        LightingSetting.BLUE_HOUR,
+        LightingSetting.GOLDEN_HOUR,
+        LightingSetting.NIGHT,
+        LightingSetting.NOON,
+        LightingSetting.SUNNY_DAY,
+        LightingSetting.SUNRISE
+    ].sort(),
+    "Weather & Environment": [
+        LightingSetting.FOGGY,
+        LightingSetting.OVERCAST,
+        LightingSetting.RAINY,
+        LightingSetting.SNOWY
+    ].sort(),
+    "Artificial & Indoor": [
+        LightingSetting.NEON,
+        LightingSetting.STUDIO,
+        LightingSetting.WARM_INTERIOR
+    ].sort(),
+    "Mood & Artistic": [
+        LightingSetting.BIOLUMINESCENT,
+        LightingSetting.CINEMATIC,
+        LightingSetting.MOODY
+    ].sort()
 };
 
-// --- SECURITY HELPER ---
-const verifyAccess = async (key: string): Promise<boolean> => {
-  if (!key) return false;
-  return key.trim() === 'ASTRA777';
+// --- SCROLLABLE TEXT COMPONENT (MARQUEE ON HOVER) ---
+const ScrollableText: React.FC<{ text: string; className?: string }> = ({ text, className = "" }) => {
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (containerRef.current && textRef.current) {
+        const containerWidth = containerRef.current.offsetWidth;
+        const textWidth = textRef.current.offsetWidth;
+        // Only set overflowing if container has valid width to avoid false positives on mount
+        if (containerWidth > 0) {
+            setIsOverflowing(textWidth > containerWidth);
+        }
+      }
+    };
+    checkOverflow();
+    window.addEventListener('resize', checkOverflow);
+    return () => window.removeEventListener('resize', checkOverflow);
+  }, [text]);
+
+  return (
+    <div 
+      ref={containerRef} 
+      className={`relative overflow-hidden w-full text-left group/text ${className}`} 
+      title={text}
+    >
+      <div className={`whitespace-nowrap ${isOverflowing ? 'group-hover/text:animate-scroll marquee-wrapper' : 'truncate'}`}>
+        <span ref={textRef} className={isOverflowing ? 'pr-6' : ''}>{text}</span>
+        {isOverflowing && <span>{text}</span>}
+      </div>
+    </div>
+  );
+};
+
+
+// --- REALTIME ONLINE COUNTER COMPONENT ---
+const OnlineUserCounter: React.FC = () => {
+  const [count, setCount] = useState<number>(0);
+
+  useEffect(() => {
+    const listRef = ref(db, 'online_users');
+    const userRef = push(listRef);
+
+    onDisconnect(userRef).remove();
+    
+    set(userRef, {
+      timestamp: serverTimestamp()
+    });
+
+    const unsubscribe = onValue(listRef, (snapshot) => {
+      setCount(snapshot.size || 0);
+    });
+
+    return () => {
+      unsubscribe();
+      set(userRef, null);
+    };
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#e2b36e]/10 border border-[#e2b36e]/30 backdrop-blur-md shadow-[0_0_15px_rgba(226,179,110,0.1)] select-none cursor-default transition-transform duration-300 hover:scale-105">
+      <div className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e2b36e] opacity-75 duration-1000"></span>
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#e2b36e] shadow-[0_0_5px_#e2b36e]"></span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-bold text-[#e2b36e] tracking-widest tabular-nums drop-shadow-[0_0_2px_rgba(226,179,110,0.5)]">
+          {count} Online Now
+        </span>
+      </div>
+    </div>
+  );
 };
 
 // --- TYPES FOR EDITING ---
@@ -146,8 +241,8 @@ interface ShapeObject {
     type: 'rect' | 'circle';
     x: number;
     y: number;
-    width: number; // For circle, this is diameter X
-    height: number; // For circle, this is diameter Y
+    width: number; 
+    height: number; 
 }
 
 // --- SUB-COMPONENT: FULL SCREEN VIEWER & EDITOR ---
@@ -155,19 +250,19 @@ const FullScreenViewer: React.FC<{
     src: string; 
     onClose: () => void; 
     onSaveEdit?: (newUrl: string) => void;
-    isEditableType: boolean; 
-    isGenerated: boolean; 
-    onValidateAccess: () => boolean; 
+    isEditableType: boolean; // Controls VISIBILITY of the button (Input/Generated vs Ref)
+    isGenerated: boolean; // NEW: To control Download button visibility
+    onValidateAccess: () => boolean; // Callback to check auth when clicked
 }> = ({ src, onClose, onSaveEdit, isEditableType, isGenerated, onValidateAccess }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isMiddlePanning, setIsMiddlePanning] = useState(false);
+  const [isMiddlePanning, setIsMiddlePanning] = useState(false); // NEW STATE FOR MIDDLE MOUSE
   
   // EDIT MODE STATES
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editTool, setEditTool] = useState<'brush' | 'rect' | 'circle' | 'move' | 'eraser'>('brush');
-  const [brushSize, setBrushSize] = useState(30);
-  const [eraserSize, setEraserSize] = useState(30); // New Eraser Size
+  const [editTool, setEditTool] = useState<'brush' | 'rect' | 'circle' | 'move' | 'eraser'>('brush'); 
+  const [brushSize, setBrushSize] = useState(30); 
+  const [eraserSize, setEraserSize] = useState(30); 
   const [editPrompt, setEditPrompt] = useState('');
   const [isEditingLoading, setIsEditingLoading] = useState(false);
   const [editAutoLoading, setEditAutoLoading] = useState(false);
@@ -183,20 +278,19 @@ const FullScreenViewer: React.FC<{
   
   // Interaction State
   const [interactionState, setInteractionState] = useState<'NONE' | 'DRAWING_SHAPE' | 'DRAGGING_SHAPE' | 'RESIZING_SHAPE' | 'PAINTING' | 'PANNING'>('NONE');
-  
-  const dragStartRef = useRef({ x: 0, y: 0 }); // Screen coordinates for panning
-  const actionStartRef = useRef({ x: 0, y: 0 }); // Canvas coordinates for actions
-  const initialShapeRef = useRef<Partial<ShapeObject>>({}); // Store initial shape state during transform
+
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const actionStartRef = useRef({ x: 0, y: 0 }); 
+  const initialShapeRef = useRef<Partial<ShapeObject>>({}); 
 
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // CANVAS REFS
-  // visualCanvas: Shows shapes, selection UI, and composition of paint layer
   const visualCanvasRef = useRef<HTMLCanvasElement>(null); 
-  // paintCanvas: Offscreen canvas specifically for Brush/Eraser strokes
   const paintCanvasRef = useRef<HTMLCanvasElement | null>(null); 
 
+  // ABORT CONTROLLER FOR EDIT
   const editAbortControllerRef = useRef<AbortController | null>(null);
 
   // PASTE HANDLER FOR EDIT MODE
@@ -204,6 +298,9 @@ const FullScreenViewer: React.FC<{
     if (!isEditMode) return;
 
     const handlePaste = (e: ClipboardEvent) => {
+        // Prevent shape deletion if pasting text
+        if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
+
         if (!e.clipboardData) return;
         const items = e.clipboardData.items;
         const newImages: string[] = [];
@@ -241,13 +338,12 @@ const FullScreenViewer: React.FC<{
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
+      // FIX: IGNORE KEYDOWN IF USER IS TYPING IN INPUT OR TEXTAREA
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
       if (e.key === 'Escape') onClose();
-
-      // Ensure we don't delete shapes if user is typing in the prompt textarea or any input
-      const activeTag = document.activeElement?.tagName.toLowerCase();
-      const isTyping = activeTag === 'input' || activeTag === 'textarea';
-
-      if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && selectedShapeId && !isEditingLoading) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeId && !isEditingLoading) {
           setShapes(prev => prev.filter(s => s.id !== selectedShapeId));
           setSelectedShapeId(null);
       }
@@ -283,16 +379,13 @@ const FullScreenViewer: React.FC<{
 
   useEffect(() => {
     if (isEditMode) {
-      // Add small delay to ensure image is rendered/sized
       setTimeout(initCanvases, 50);
     }
   }, [isEditMode, src]);
 
-  // Re-render whenever shapes or selection changes
   useEffect(() => {
       if (isEditMode) renderCanvas();
   }, [shapes, selectedShapeId, isEditMode]);
-
 
   // --- RENDERING LOGIC ---
   const renderCanvas = () => {
@@ -306,31 +399,22 @@ const FullScreenViewer: React.FC<{
       // 1. Clear
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 2. Draw Paint Layer (Brush/Eraser strokes)
-      // UPDATED: Stronger shadow for better visibility (Thicker "outline" effect)
-      ctx.save();
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)'; // Darker
-      ctx.shadowBlur = 2; // Sharper shadow
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
+      // 2. Draw Paint Layer
       ctx.drawImage(paintCanvas, 0, 0);
-      ctx.restore();
 
       // 3. Draw Shapes
       shapes.forEach(shape => {
           ctx.save();
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; // High visibility white
+          // Use Theme Gold/White for shapes
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; 
+          ctx.strokeStyle = '#e2b36e'; // Gold Border
+          ctx.lineWidth = 3 / scale; // Thicker border that scales with zoom
           
-          // UPDATED: Thicker stroke (5px)
-          ctx.lineWidth = 5;
-          ctx.strokeStyle = '#000000'; // Pure black for max contrast
-
           if (shape.type === 'rect') {
               ctx.fillRect(shape.x, shape.y, shape.width, shape.height);
               ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
           } else if (shape.type === 'circle') {
               ctx.beginPath();
-              // Ellipse logic for robust resizing
               const radiusX = Math.abs(shape.width) / 2;
               const radiusY = Math.abs(shape.height) / 2;
               const centerX = shape.x + shape.width / 2;
@@ -350,70 +434,68 @@ const FullScreenViewer: React.FC<{
 
   const drawSelectionUI = (ctx: CanvasRenderingContext2D, shape: ShapeObject) => {
       const { x, y, width, height } = shape;
-      const uiScale = 1 / scale; // Keep consistent visual size regardless of zoom
+      const uiScale = 1 / scale; 
       
-      // --- SIZE CONFIGURATION (INCREASED AS REQUESTED) ---
-      const handleSize = 45 * uiScale; // Big Resize Handle
-      const delSize = 45 * uiScale;    // Big Delete Button
-      const centerSize = 12 * uiScale; // Center Move Point radius
-      const padding = 2 * uiScale;
+      const handleSize = 45 * uiScale; 
+      const delSize = 45 * uiScale;    
+      const centerSize = 12 * uiScale; 
+      const padding = 4 * uiScale; // Increased padding
+
+      const themeGold = '#e2b36e';
 
       ctx.save();
       // Bounding Box
-      ctx.strokeStyle = '#3b82f6'; // Blue selection
-      ctx.lineWidth = 2 * uiScale;
-      ctx.setLineDash([6 * uiScale, 4 * uiScale]);
+      ctx.strokeStyle = themeGold; // Gold selection
+      ctx.lineWidth = 4 * uiScale; // Thicker Selection Box (Increased from 2)
+      ctx.setLineDash([8 * uiScale, 6 * uiScale]); // Wider dash
       ctx.strokeRect(x - padding, y - padding, width + padding*2, height + padding*2);
       
-      // --- CENTER MOVE HANDLE (NEW) ---
+      // --- CENTER MOVE HANDLE ---
       const centerX = x + width / 2;
       const centerY = y + height / 2;
       ctx.setLineDash([]);
       
       // Center Point Background
-      ctx.fillStyle = '#3b82f6'; // Blue
+      ctx.fillStyle = themeGold;
       ctx.beginPath();
       ctx.arc(centerX, centerY, centerSize, 0, 2 * Math.PI);
       ctx.fill();
       
       // Center Point Border
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2 * uiScale;
+      ctx.strokeStyle = '#09232b'; // Dark Teal contrast
+      ctx.lineWidth = 3 * uiScale;
       ctx.stroke();
 
       // --- RESIZE HANDLE (Double Arrow) ---
       const handleX = x + width;
       const handleY = y + height;
       
-      // 1. White Circle Background
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 2 * uiScale;
+      // 1. Circle Background
+      ctx.fillStyle = '#09232b'; // Dark Background
+      ctx.strokeStyle = themeGold;
+      ctx.lineWidth = 3 * uiScale;
       ctx.beginPath();
       ctx.arc(handleX, handleY, handleSize / 2, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
 
-      // 2. Draw Diagonal Arrow Inside
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 4 * uiScale; // Thicker arrow
+      // 2. Draw Arrow
+      ctx.strokeStyle = themeGold;
+      ctx.lineWidth = 5 * uiScale; // Thicker Arrow
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
       const arrowR = handleSize / 3.5;
       
       ctx.beginPath();
-      // Main Diagonal Line
       ctx.moveTo(handleX - arrowR, handleY - arrowR);
       ctx.lineTo(handleX + arrowR, handleY + arrowR);
       
-      // Arrowhead Bottom-Right
       ctx.moveTo(handleX + arrowR, handleY + arrowR);
       ctx.lineTo(handleX + arrowR - arrowR/1.2, handleY + arrowR);
       ctx.moveTo(handleX + arrowR, handleY + arrowR);
       ctx.lineTo(handleX + arrowR, handleY + arrowR - arrowR/1.2);
 
-      // Arrowhead Top-Left
       ctx.moveTo(handleX - arrowR, handleY - arrowR);
       ctx.lineTo(handleX - arrowR + arrowR/1.2, handleY - arrowR);
       ctx.moveTo(handleX - arrowR, handleY - arrowR);
@@ -433,7 +515,7 @@ const FullScreenViewer: React.FC<{
       
       // White X
       ctx.strokeStyle = 'white';
-      ctx.lineWidth = 4 * uiScale; // Thicker X
+      ctx.lineWidth = 5 * uiScale; // Thicker X
       const xPad = delSize / 4;
       ctx.beginPath();
       ctx.moveTo(delX - xPad, delY - xPad);
@@ -465,11 +547,10 @@ const FullScreenViewer: React.FC<{
   };
 
   const checkHit = (x: number, y: number): { type: 'body' | 'resize' | 'delete' | 'none', id: string | null } => {
-      // Check handles first (z-index simulation)
       if (selectedShapeId) {
           const shape = shapes.find(s => s.id === selectedShapeId);
           if (shape) {
-              const handleHitThreshold = 50 * (1 / scale); // Generous hit area for buttons
+              const handleHitThreshold = 50 * (1 / scale); 
               
               // Resize Handle (Bottom Right)
               const resX = shape.x + shape.width;
@@ -483,10 +564,8 @@ const FullScreenViewer: React.FC<{
           }
       }
 
-      // Check bodies (Reverse order to select top-most)
       for (let i = shapes.length - 1; i >= 0; i--) {
           const s = shapes[i];
-          // Simple rect hit test for body (covers center point too)
           if (x >= s.x && x <= s.x + s.width && y >= s.y && y <= s.y + s.height) {
               return { type: 'body', id: s.id };
           }
@@ -498,7 +577,6 @@ const FullScreenViewer: React.FC<{
   // --- MOUSE HANDLERS ---
 
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
-    // MIDDLE MOUSE PAN (Priority 1)
     const isMiddleClick = 'button' in e && (e as React.MouseEvent).button === 1;
     if (isMiddleClick) {
         e.preventDefault();
@@ -511,7 +589,6 @@ const FullScreenViewer: React.FC<{
     }
 
     if (!isEditMode) {
-        // View Mode Dragging
         if (scale > 1) {
             setInteractionState('PANNING');
             const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -544,7 +621,6 @@ const FullScreenViewer: React.FC<{
         }
 
         if (hit.type === 'body' && hit.id) {
-            // Select shape
             setSelectedShapeId(hit.id);
             setInteractionState('DRAGGING_SHAPE');
             const s = shapes.find(sh => sh.id === hit.id);
@@ -552,9 +628,8 @@ const FullScreenViewer: React.FC<{
             return;
         }
 
-        // If no hit, and tool is Shape -> Draw New
         if (editTool === 'rect' || editTool === 'circle') {
-            setSelectedShapeId(null); // Deselect prev
+            setSelectedShapeId(null); 
             setInteractionState('DRAWING_SHAPE');
             const newId = Date.now().toString();
             const newShape: ShapeObject = {
@@ -566,12 +641,11 @@ const FullScreenViewer: React.FC<{
                 height: 0
             };
             setShapes(prev => [...prev, newShape]);
-            setSelectedShapeId(newId); // Auto select new
-            initialShapeRef.current = { x, y }; // Origin
+            setSelectedShapeId(newId); 
+            initialShapeRef.current = { x, y }; 
             return;
         }
         
-        // If Move tool and no hit -> Pan
         if (editTool === 'move' && scale > 1) {
              setInteractionState('PANNING');
              const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -580,14 +654,12 @@ const FullScreenViewer: React.FC<{
              return;
         }
     } else if (editTool === 'brush' || editTool === 'eraser') {
-        // PAINTING MODE
         setInteractionState('PAINTING');
         paint(x, y, true); // Start stroke
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
-    // 1. PANNING HANDLER
     if (interactionState === 'PANNING' || isMiddlePanning) {
         e.preventDefault();
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
@@ -604,37 +676,32 @@ const FullScreenViewer: React.FC<{
 
     const { x, y } = getCanvasCoordinates(e);
 
-    // 2. HOVER EFFECTS (Change Cursor)
+    // HOVER EFFECTS
     if (interactionState === 'NONE') {
         if (!containerRef.current) return;
         
-        // Check for Shape Hits
         const hit = checkHit(x, y);
         
         if (hit.type === 'delete' || hit.type === 'resize') {
-            // Hand (Pointer) for buttons
             containerRef.current.style.cursor = 'pointer';
         } else if (hit.type === 'body') {
-            // Grab/Move for body/center
             containerRef.current.style.cursor = 'move';
         } else {
-            // Reset to tool default
             if (editTool === 'move') {
                 containerRef.current.style.cursor = scale > 1 ? 'grab' : 'default';
             } else if (editTool === 'brush' || editTool === 'eraser') {
                 containerRef.current.style.cursor = 'crosshair';
             } else {
-                containerRef.current.style.cursor = 'crosshair'; // Shape drawing
+                containerRef.current.style.cursor = 'crosshair'; 
             }
         }
         return;
     }
 
-    // 3. INTERACTION LOGIC
+    // INTERACTION LOGIC
     if (interactionState === 'PAINTING') {
         paint(x, y, false);
     } else if (interactionState === 'DRAWING_SHAPE') {
-        // Update width/height of selected (last) shape
         const originX = initialShapeRef.current.x || 0;
         const originY = initialShapeRef.current.y || 0;
         
@@ -643,9 +710,7 @@ const FullScreenViewer: React.FC<{
                 let width = x - originX;
                 let height = y - originY;
                 
-                // If circle, force 1:1 ratio for nice UX drawing, or freeform oval? Let's do freeform oval logic but stored as rect bounds
                 if (e.shiftKey && s.type === 'rect') {
-                    // Square constraint
                     const max = Math.max(Math.abs(width), Math.abs(height));
                     width = width < 0 ? -max : max;
                     height = height < 0 ? -max : max;
@@ -675,8 +740,6 @@ const FullScreenViewer: React.FC<{
             return s;
         }));
     } else if (interactionState === 'RESIZING_SHAPE') {
-        // Logic depends on handle. Currently only bottom-right handle.
-        // It stretches from the top-left origin (x,y)
         const s = initialShapeRef.current;
         if (!s) return;
         
@@ -696,9 +759,8 @@ const FullScreenViewer: React.FC<{
     setIsMiddlePanning(false);
     setInteractionState('NONE');
     
-    // Finish painting path
     const ctx = paintCanvasRef.current?.getContext('2d');
-    if (ctx) ctx.beginPath(); // Reset path
+    if (ctx) ctx.beginPath(); 
   };
 
   // --- PAINTING HELPER ---
@@ -711,11 +773,11 @@ const FullScreenViewer: React.FC<{
       
       if (editTool === 'eraser') {
           ctx.globalCompositeOperation = 'destination-out';
-          ctx.lineWidth = eraserSize; // Adjustable Eraser Size
+          ctx.lineWidth = eraserSize; 
       } else {
           ctx.globalCompositeOperation = 'source-over';
           ctx.lineWidth = brushSize;
-          ctx.strokeStyle = 'rgba(255, 255, 255, 1)'; // Solid white mask
+          ctx.strokeStyle = 'rgba(255, 255, 255, 1)'; 
       }
 
       if (isStart) {
@@ -726,7 +788,7 @@ const FullScreenViewer: React.FC<{
           ctx.stroke();
       }
       
-      renderCanvas(); // Update visual canvas
+      renderCanvas(); 
   };
 
   // --- CLEAR & EXPORT ---
@@ -786,9 +848,6 @@ const FullScreenViewer: React.FC<{
 
     try {
       // 1. COMPOSITE THE MASK
-      // We need to combine Shapes + PaintCanvas into a single B&W image
-      // White = Edit area, Black = Protected
-      
       const maskCanvas = document.createElement('canvas');
       maskCanvas.width = imgCanvas.width;
       maskCanvas.height = imgCanvas.height;
@@ -829,9 +888,9 @@ const FullScreenViewer: React.FC<{
 
       if (onSaveEdit && editedUrl) {
         onSaveEdit(editedUrl);
-        clearMask(); // Reset UI
-        setEditPrompt(''); // Clear the prompt
-        // Note: We deliberately do NOT clear editReferenceImages here, allowing users to reuse them for next edits.
+        clearMask(); 
+        setEditPrompt(''); 
+        // Note: We deliberately do NOT clear editReferenceImages here, allowing users to reuse them.
       }
     } catch (e: any) {
       if (e.name === 'AbortError' || e.message === 'Aborted') return;
@@ -898,18 +957,19 @@ const FullScreenViewer: React.FC<{
 
   return (
     <div 
-      className="fixed inset-0 z-[100] bg-[#0f172a]/95 flex flex-col animate-in fade-in duration-300"
+      className="fixed inset-0 z-[100] bg-[#09232b]/95 flex flex-col animate-in fade-in duration-300"
       onWheel={handleWheel}
+      // Only close on click if not interacting with UI
       onClick={(e) => { if (e.target === e.currentTarget && !isEditMode) onClose(); }} 
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* HEADER BAR */}
-      <div className="flex-none h-16 w-full px-6 flex justify-between items-center z-50 bg-gradient-to-b from-[#0f172a] to-transparent pointer-events-none">
-        <div className="text-white/80 text-sm flex gap-4 pointer-events-auto items-center">
+      <div className="flex-none h-16 w-full px-6 flex justify-between items-center z-50 bg-gradient-to-b from-[#09232b] to-[#09232b]/0 pointer-events-none">
+        <div className="text-[#e2b36e]/80 text-sm flex gap-4 pointer-events-auto items-center">
             {isEditMode ? (
-                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full border border-white/20 backdrop-blur-md">
+                <div className="flex items-center gap-2 bg-[#e2b36e]/10 px-3 py-1.5 rounded-full border border-[#e2b36e]/20 backdrop-blur-md">
                      <span className="animate-pulse w-2 h-2 rounded-full bg-red-500"></span>
-                     <span className="font-bold text-white tracking-wider text-xs uppercase">Edit Mode Active</span>
+                     <span className="font-bold text-[#e2b36e] tracking-wider text-xs uppercase">Edit Mode Active</span>
                 </div>
             ) : (
                 <>
@@ -932,7 +992,7 @@ const FullScreenViewer: React.FC<{
                             }
                         }
                     }}
-                    className={`p-2 rounded-full transition-all duration-300 border ${isEditMode ? 'bg-white text-[#0f172a] border-white shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                    className={`p-2 rounded-full transition-all duration-300 border ${isEditMode ? 'bg-[#e2b36e] text-[#09232b] border-[#e2b36e] shadow-[0_0_15px_#e2b36e]' : 'bg-[#e2b36e]/10 text-[#e2b36e] border-[#e2b36e]/20 hover:bg-[#e2b36e]/20'}`}
                     title={isEditMode ? "Exit Edit Mode" : "Edit Image"}
                  >
                     {isEditMode ? <Check className="w-6 h-6" /> : <Edit3 className="w-6 h-6" />}
@@ -942,7 +1002,7 @@ const FullScreenViewer: React.FC<{
              {isGenerated && (
                  <button 
                     onClick={() => handleDownload(src)}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors border border-transparent hover:border-white/30"
+                    className="p-2 bg-[#e2b36e]/10 hover:bg-[#e2b36e]/20 rounded-full text-[#e2b36e] transition-colors border border-transparent hover:border-[#e2b36e]/30"
                     title="Download Result"
                  >
                     <Download className="w-6 h-6" />
@@ -951,71 +1011,71 @@ const FullScreenViewer: React.FC<{
 
              <button 
                 onClick={onClose}
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors border border-transparent hover:border-white/30"
+                className="p-2 bg-[#e2b36e]/10 hover:bg-[#e2b36e]/20 rounded-full text-[#e2b36e] transition-colors border border-transparent hover:border-[#e2b36e]/30"
             >
                 <X className="w-6 h-6" />
             </button>
         </div>
       </div>
 
-      {/* EDIT TOOLBAR (FLOATING LEFT) */}
+      {/* EDIT TOOLBAR (FLOATING LEFT) - ONLY IF EDIT MODE ACTIVE */}
       {isEditMode && (
           <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-50 pointer-events-auto animate-in slide-in-from-left fade-in duration-300">
              <GlassCard className="p-3 flex flex-col gap-3">
-                 <button onClick={() => { setEditTool('move'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'move' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Move/Select">
+                 <button onClick={() => { setEditTool('move'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'move' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Move/Select">
                     <Hand size={20} />
                  </button>
-                 <div className="h-[1px] w-full bg-white/20 my-1"></div>
+                 <div className="h-[1px] w-full bg-[#e2b36e]/20 my-1"></div>
                  
-                 {/* BRUSH TOOL */}
-                 <button onClick={() => { setEditTool('brush'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'brush' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Brush">
+                 {/* BRUSH TOOL & SLIDER */}
+                 <button onClick={() => { setEditTool('brush'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'brush' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Brush">
                     <Brush size={20} />
                  </button>
                  {editTool === 'brush' && (
-                     <div className="absolute left-full top-16 ml-3 bg-[#1e293b]/90 backdrop-blur-md border border-white/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
+                     <div className="absolute left-full top-16 ml-3 bg-[#103742]/90 backdrop-blur-md border border-[#e2b36e]/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
                         <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-white uppercase font-bold">Brush Size</span>
+                            <span className="text-[10px] text-[#e2b36e] uppercase font-bold">Brush Size</span>
                             <span className="text-[10px] text-white font-mono">{brushSize}px</span>
                         </div>
                         <input 
                             type="range" min="5" max="500" value={brushSize} 
                             onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                            className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+                            className="w-full h-1.5 bg-[#e2b36e]/20 rounded-lg appearance-none cursor-pointer accent-[#e2b36e]"
                         />
                      </div>
                  )}
 
-                 {/* ERASER TOOL */}
-                 <button onClick={() => { setEditTool('eraser'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'eraser' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Eraser Brush">
+                 {/* ERASER TOOL & SLIDER */}
+                 <button onClick={() => { setEditTool('eraser'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'eraser' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Eraser Brush">
                     <Eraser size={20} />
                  </button>
                  {editTool === 'eraser' && (
-                     <div className="absolute left-full top-28 ml-3 bg-[#1e293b]/90 backdrop-blur-md border border-white/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
+                     <div className="absolute left-full top-28 ml-3 bg-[#103742]/90 backdrop-blur-md border border-[#e2b36e]/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
                         <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-white uppercase font-bold">Eraser Size</span>
+                            <span className="text-[10px] text-[#e2b36e] uppercase font-bold">Eraser Size</span>
                             <span className="text-[10px] text-white font-mono">{eraserSize}px</span>
                         </div>
                         <input 
                             type="range" min="5" max="500" value={eraserSize} 
                             onChange={(e) => setEraserSize(parseInt(e.target.value))}
-                            className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+                            className="w-full h-1.5 bg-[#e2b36e]/20 rounded-lg appearance-none cursor-pointer accent-[#e2b36e]"
                         />
                      </div>
                  )}
 
-                 <div className="h-[1px] w-full bg-white/20 my-1"></div>
+                 <div className="h-[1px] w-full bg-[#e2b36e]/20 my-1"></div>
                  
                  {/* SHAPES */}
-                 <button onClick={() => { setEditTool('rect'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'rect' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Rectangle"><SquareIcon size={20} /></button>
-                 <button onClick={() => { setEditTool('circle'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'circle' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Circle"><CircleIcon size={20} /></button>
+                 <button onClick={() => { setEditTool('rect'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'rect' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Rectangle"><SquareIcon size={20} /></button>
+                 <button onClick={() => { setEditTool('circle'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'circle' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Circle"><CircleIcon size={20} /></button>
                  
-                 <div className="h-[1px] w-full bg-white/20 my-1"></div>
+                 <div className="h-[1px] w-full bg-[#e2b36e]/20 my-1"></div>
                  <button onClick={clearMask} className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors" title="Clear Mask"><Trash2 size={20} /></button>
              </GlassCard>
           </div>
       )}
 
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN CONTENT AREA - FLEX-1 TO TAKE AVAILABLE SPACE */}
       <div 
         ref={containerRef}
         className={`flex-1 w-full relative overflow-hidden flex items-center justify-center p-6 sm:p-10 ${isEditMode ? (editTool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair') : 'cursor-move'}`}
@@ -1042,7 +1102,7 @@ const FullScreenViewer: React.FC<{
           className="select-none pointer-events-auto will-change-transform shadow-2xl"
           draggable={false}
         />
-        {/* CANVAS OVERLAY */}
+        {/* CANVAS OVERLAY FOR MASKING */}
         <canvas 
             ref={visualCanvasRef}
             className={`absolute pointer-events-none will-change-transform ${!isEditMode && 'hidden'}`}
@@ -1055,34 +1115,33 @@ const FullScreenViewer: React.FC<{
         />
       </div>
 
-      {/* BOTTOM CONTROLS */}
-      <div className="flex-none w-full flex justify-center pb-6 pt-2 bg-gradient-to-t from-[#0f172a] via-[#0f172a] to-transparent z-50 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+      {/* BOTTOM CONTROLS (ZOOM OR PROMPT) - FIXED AT BOTTOM, NO OVERLAP */}
+      <div className="flex-none w-full flex justify-center pb-6 pt-2 bg-gradient-to-t from-[#09232b] via-[#09232b] to-transparent z-50 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
          {!isEditMode ? (
             /* VIEW MODE CONTROLS */
-            <div className="flex items-center gap-4 bg-[#1e293b]/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                <button onClick={() => handleZoom(-0.5)} className="p-2 hover:bg-white/10 rounded-lg text-white disabled:opacity-30" disabled={scale <= 1}><ZoomOut className="w-5 h-5" /></button>
-                <span className="text-white font-mono min-w-[3ch] text-center font-bold">{Math.round(scale * 100)}%</span>
-                <button onClick={() => handleZoom(0.5)} className="p-2 hover:bg-white/10 rounded-lg text-white disabled:opacity-30" disabled={scale >= 5}><ZoomIn className="w-5 h-5" /></button>
+            <div className="flex items-center gap-4 bg-[#103742]/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-[#e2b36e]/20 shadow-[0_0_20px_rgba(226,179,110,0.1)]">
+                <button onClick={() => handleZoom(-0.5)} className="p-2 hover:bg-[#e2b36e]/10 rounded-lg text-[#e2b36e] disabled:opacity-30" disabled={scale <= 1}><ZoomOut className="w-5 h-5" /></button>
+                <span className="text-[#e2b36e] font-mono min-w-[3ch] text-center font-bold">{Math.round(scale * 100)}%</span>
+                <button onClick={() => handleZoom(0.5)} className="p-2 hover:bg-[#e2b36e]/10 rounded-lg text-[#e2b36e] disabled:opacity-30" disabled={scale >= 5}><ZoomIn className="w-5 h-5" /></button>
             </div>
          ) : (
              /* EDIT MODE PROMPT BAR */
              <GlassCard className="p-0 flex flex-col gap-0 w-[800px] max-w-[95vw] animate-in slide-in-from-bottom fade-in duration-300 relative overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-                  {/* EDIT MODE REFERENCES UI - REDESIGNED */}
+                  {/* EDIT MODE REFERENCES UI - NEW ADDITION */}
                   <div className="w-full px-1 pt-1 pb-1">
-                      <div className="border border-dashed border-white/20 bg-white/5 rounded-xl p-2.5 flex flex-col gap-2">
+                      <div className="border border-dashed border-[#e2b36e]/20 bg-[#e2b36e]/5 rounded-xl p-2.5 flex flex-col gap-2">
                           <div className="flex justify-between items-center px-1">
-                              <label className="text-[10px] font-bold text-white/60 flex items-center gap-1.5 uppercase tracking-wider">
+                              <label className="text-[10px] font-bold text-[#e2b36e]/60 flex items-center gap-1.5 uppercase tracking-wider">
                                   <CopyPlus size={10} /> References
                               </label>
-                              <span className="text-[10px] text-white/40 font-mono">{editReferenceImages.length}/5</span>
+                              <span className="text-[10px] text-[#e2b36e]/40 font-mono">{editReferenceImages.length}/5</span>
                           </div>
                           
-                          {/* UPDATED: Added padding p-2 to prevent clipping of absolute delete buttons */}
                           <div className="flex gap-2 overflow-x-auto custom-scrollbar p-2">
                               <button 
                                 onClick={() => editRefInputRef.current?.click()} 
                                 disabled={editReferenceImages.length >= 5}
-                                className={`h-12 w-12 flex-none rounded-lg border border-dashed flex items-center justify-center transition-all ${editReferenceImages.length >= 5 ? 'opacity-50 cursor-not-allowed border-white/20 text-white/20' : 'border-white/30 text-white hover:bg-white/10'}`}
+                                className={`h-12 w-12 flex-none rounded-lg border border-dashed flex items-center justify-center transition-all ${editReferenceImages.length >= 5 ? 'opacity-50 cursor-not-allowed border-[#e2b36e]/20 text-[#e2b36e]/20' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
                                 title="Add Reference Image or Paste (Ctrl+V)"
                               >
                                   <Plus size={18} />
@@ -1090,14 +1149,14 @@ const FullScreenViewer: React.FC<{
                               <input type="file" ref={editRefInputRef} className="hidden" onChange={handleEditRefUpload} accept="image/*" multiple />
                               
                               {editReferenceImages.length === 0 && (
-                                  <div className="flex items-center text-[10px] text-white/30 italic select-none px-2">
+                                  <div className="flex items-center text-[10px] text-[#e2b36e]/30 italic select-none px-2">
                                       Upload or Paste (Ctrl+V) images here to guide the AI
                                   </div>
                               )}
 
                               {editReferenceImages.map((img, idx) => (
                                   <div key={idx} className="relative h-12 w-12 flex-none group">
-                                      <img src={img} alt={`Ref ${idx}`} className="h-full w-full object-cover rounded-lg border border-white/20" />
+                                      <img src={img} alt={`Ref ${idx}`} className="h-full w-full object-cover rounded-lg border border-[#e2b36e]/20" />
                                       <button 
                                         onClick={() => removeEditRefImage(idx)} 
                                         className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm scale-75 hover:scale-100 z-10"
@@ -1111,21 +1170,23 @@ const FullScreenViewer: React.FC<{
                   </div>
 
                   <div className="relative w-full h-32">
-                      <div className="relative flex-1 bg-white/5 hover:bg-white/10 focus-within:bg-white/10 transition-colors h-full">
+                      <div className="relative flex-1 bg-[#e2b36e]/5 hover:bg-[#e2b36e]/10 focus-within:bg-[#e2b36e]/10 transition-colors h-full">
                         <textarea 
                             value={editPrompt}
                             onChange={(e) => setEditPrompt(e.target.value)}
                             placeholder="Describe what to change in the highlighted area..."
-                            className="w-full h-full bg-transparent border-none px-4 py-3 text-sm text-white placeholder-white/40 focus:outline-none resize-none custom-scrollbar pb-12"
+                            className="w-full h-full bg-transparent border-none px-4 py-3 text-sm text-[#e2b36e] placeholder-[#e2b36e]/40 focus:outline-none resize-none custom-scrollbar pb-12"
                             onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditGenerate(); }}}
                         />
                       </div>
+                      
+                      {/* CONDITIONAL BUTTONS: AUTO or ENHANCE */}
                       <div className="absolute left-3 bottom-3 flex gap-2 z-10">
                           {!editPrompt.trim() ? (
                               <button 
                                 onClick={handleEditAutoPrompt} 
                                 disabled={editAutoLoading} 
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg border border-white/30 ${editAutoLoading ? 'bg-[#1e293b] text-white cursor-wait' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg border border-[#e2b36e]/30 ${editAutoLoading ? 'bg-[#103742] text-[#e2b36e] cursor-wait' : 'bg-[#e2b36e]/20 text-[#e2b36e] hover:bg-[#e2b36e]/30'}`}
                               >
                                   <Sparkles size={12} className={editAutoLoading ? "animate-spin" : ""} />
                                   {editAutoLoading ? 'Reading...' : 'Auto Prompt'}
@@ -1134,14 +1195,15 @@ const FullScreenViewer: React.FC<{
                               <button 
                                 onClick={handleEditEnhancePrompt} 
                                 disabled={isEnhancing} 
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isEnhancing ? 'bg-slate-900 border border-white/10 text-white/30 cursor-wait' : 'bg-[#1e293b] border border-white/30 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] hover:bg-[#334155]'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isEnhancing ? 'bg-slate-900 border border-white/10 text-white/30 cursor-wait' : 'bg-[#103742] border border-[#e2b36e]/30 text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] hover:shadow-[0_0_25px_rgba(226,179,110,0.4)] hover:bg-[#0c2e38]'}`}
                               >
-                                  <Wand2 size={12} className={isEnhancing ? "animate-spin" : "fill-white/50"} />
+                                  <Wand2 size={12} className={isEnhancing ? "animate-spin" : "fill-[#e2b36e]/50"} />
                                   {isEnhancing ? 'Enhancing...' : 'Enhance'}
                               </button>
                           )}
                       </div>
                       
+                      {/* GENERATE BUTTON - UPDATED TO SUPPORT STOP FUNCTIONALITY */}
                       <div className="absolute right-3 bottom-3 z-10 flex items-center gap-2">
                            <Button 
                                 onClick={isEditingLoading ? handleStopEdit : handleEditGenerate} 
@@ -1149,18 +1211,30 @@ const FullScreenViewer: React.FC<{
                                 variant={isEditingLoading ? "rainbow-stop" : "rainbow"}
                                 className="py-2 px-6 text-xs font-bold flex items-center gap-2 min-w-[120px] hover:scale-105 active:scale-95 transition-transform duration-200"
                             >
-                                {isEditingLoading ? (<><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="mr-2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>STOP</>) : (<>
-                                    <svg width="16" height="16" viewBox="0 0 100 100" className="fill-current text-white mr-1">
-                                    <path d="M 50 0 C 50 35 60 45 100 50 C 60 55 50 65 50 100 C 50 65 40 55 0 50 C 40 45 50 35 50 0 Z" />
-                                    </svg>
-                                    Generate
-                                </>)}
+                                {isEditingLoading ? (
+                                    <>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="mr-2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        </svg>
+                                        STOP
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* 4-Pointed Star Icon Inline */}
+                                        <svg width="16" height="16" viewBox="0 0 100 100" className="fill-current text-[#e2b36e]">
+                                            <path d="M 50 0 C 50 35 60 45 100 50 C 60 55 50 65 50 100 C 50 65 40 55 0 50 C 40 45 50 35 50 0 Z" />
+                                        </svg>
+                                        Generate
+                                    </>
+                                )}
                             </Button>
                       </div>
                   </div>
              </GlassCard>
          )}
       </div>
+
+      {/* SUB-COMPONENT DEFINITIONS FOR APP */}
     </div>
   );
 };
@@ -1193,21 +1267,21 @@ const AILoader: React.FC<{ progress: number; small?: boolean }> = ({ progress, s
   return (
     <div className={`flex flex-col items-center justify-center gap-3 z-10 ${small ? 'scale-75' : 'scale-100'}`}>
       <div className="relative flex items-center justify-center">
-         {/* Glow Effect - Blue/White */}
-         <div className="absolute inset-0 bg-blue-500/40 blur-xl rounded-full animate-pulse"></div>
+         {/* Glow Effect - Gold/Brown */}
+         <div className="absolute inset-0 bg-[#e2b36e]/40 blur-xl rounded-full animate-pulse"></div>
          
          {/* 4-Pointed Star SVG - ASTRA Theme - Increased size to 80x80 */}
          <svg 
             width="80" 
             height="80" 
             viewBox="0 0 100 100" 
-            className="animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]"
+            className="animate-pulse drop-shadow-[0_0_10px_rgba(226,179,110,0.8)]"
             xmlns="http://www.w3.org/2000/svg"
          >
              <defs>
                 <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#1e40af" /> {/* Dark Blue */}
-                    <stop offset="100%" stopColor="#ffffff" /> {/* White */}
+                    <stop offset="0%" stopColor="#b28e67" /> {/* Dark Gold/Brown */}
+                    <stop offset="100%" stopColor="#ffebcd" /> {/* Light Gold/White */}
                 </linearGradient>
             </defs>
             <path 
@@ -1222,79 +1296,8 @@ const AILoader: React.FC<{ progress: number; small?: boolean }> = ({ progress, s
       
       {/* Percentage - Increased to text-2xl */}
       <div className="text-center mt-3">
-          <span className="block text-white font-mono font-bold text-2xl leading-none">{Math.round(progress)}%</span>
+          <span className="block text-[#e2b36e] font-mono font-bold text-2xl leading-none">{Math.round(progress)}%</span>
       </div>
-    </div>
-  );
-};
-
-// --- SCROLLABLE TEXT COMPONENT (NEW) ---
-const ScrollableText: React.FC<{ text: string, className?: string }> = ({ text, className = "" }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLSpanElement>(null);
-  const [isOverflowing, setIsOverflowing] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [duration, setDuration] = useState(0);
-
-  useEffect(() => {
-    const checkOverflow = () => {
-      if (containerRef.current && textRef.current) {
-        const containerWidth = containerRef.current.clientWidth;
-        const textWidth = textRef.current.scrollWidth;
-        
-        // Add a small threshold (e.g. 1px) to avoid rounding jitter
-        if (textWidth > containerWidth + 1) {
-            setIsOverflowing(true);
-            // Speed calculation: Faster speed (approx 100px/s)
-            // Example: 200px width -> 2s duration
-            setDuration(textWidth / 100); 
-        } else {
-            setIsOverflowing(false);
-        }
-      }
-    };
-    
-    // Initial check
-    checkOverflow();
-    
-    window.addEventListener('resize', checkOverflow);
-    return () => window.removeEventListener('resize', checkOverflow);
-  }, [text]);
-
-  return (
-    <div 
-      ref={containerRef}
-      className={`relative overflow-hidden whitespace-nowrap min-w-0 ${className}`} 
-      onMouseEnter={() => setIsHovered(true)} 
-      onMouseLeave={() => setIsHovered(false)}
-      title={text}
-    >
-        {/* Helper style for marquee animation */}
-        <style>{`
-            @keyframes marquee {
-                0% { transform: translateX(0); }
-                100% { transform: translateX(-50%); }
-            }
-        `}</style>
-
-      {isOverflowing ? (
-         <div 
-            className="inline-flex will-change-transform"
-            style={{
-                // Infinite loop: moves from 0 to -50% (exactly one text copy length)
-                // then snaps back to 0 seamlessly
-                animation: isHovered ? `marquee ${Math.max(1.5, duration)}s linear infinite` : 'none',
-                width: 'max-content' // Ensures the div wraps both spans
-            }}
-         >
-           {/* Original Text */}
-           <span ref={textRef} className="pr-8">{text}</span>
-           {/* Duplicate Text for Loop */}
-           <span className="pr-8">{text}</span>
-         </div>
-      ) : (
-        <span ref={textRef} className="truncate block">{text}</span>
-      )}
     </div>
   );
 };
@@ -1309,13 +1312,20 @@ const App: React.FC = () => {
 
   const [selectedType, setSelectedType] = useState<MediaType>(MediaType.NONE);
   const [selectedArchStyle, setSelectedArchStyle] = useState<ArchitectureStyle>(ArchitectureStyle.NONE);
-  const [selectedRenderEngine, setSelectedRenderEngine] = useState<RenderEngine>(RenderEngine.DEFAULT);
-  const [selectedLighting, setSelectedLighting] = useState<LightingSetting>(LightingSetting.DEFAULT);
   
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>(''); 
   const [imageCount, setImageCount] = useState<number>(0);
   const [selectedQuality, setSelectedQuality] = useState<ImageQuality>(ImageQuality.AUTO);
   const [isQualitySet, setIsQualitySet] = useState(false); 
+
+  // --- NEW ARCH STATES ---
+  const [selectedRenderEngine, setSelectedRenderEngine] = useState<RenderEngine>(RenderEngine.DEFAULT);
+  const [selectedLighting, setSelectedLighting] = useState<LightingSetting>(LightingSetting.DEFAULT);
+  
+  // --- ACCORDION STATES (Reused for Side Flyout Active State) ---
+  const [lockedRenderCategory, setLockedRenderCategory] = useState<string | null>(null);
+  const [lockedLightingCategory, setLockedLightingCategory] = useState<string | null>(null);
+  const [lockedArchCategory, setLockedArchCategory] = useState<string | null>(null);
 
   // --- AUTO-SELECT STATE TRACKING ---
   const [isRatioAuto, setIsRatioAuto] = useState(false);
@@ -1344,8 +1354,9 @@ const App: React.FC = () => {
   const ratioDropdownRef = useRef<HTMLDivElement>(null);
   const countDropdownRef = useRef<HTMLDivElement>(null);
   const qualityDropdownRef = useRef<HTMLDivElement>(null);
-  const renderEngineDropdownRef = useRef<HTMLDivElement>(null);
+  const renderDropdownRef = useRef<HTMLDivElement>(null);
   const lightingDropdownRef = useRef<HTMLDivElement>(null);
+
   const inputInputRef = useRef<HTMLInputElement>(null);
   const refInputRef = useRef<HTMLInputElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -1356,36 +1367,11 @@ const App: React.FC = () => {
   const [isRatioDropdownOpen, setIsRatioDropdownOpen] = useState(false);
   const [isCountDropdownOpen, setIsCountDropdownOpen] = useState(false);
   const [isQualityDropdownOpen, setIsQualityDropdownOpen] = useState(false);
-  const [isRenderEngineDropdownOpen, setIsRenderEngineDropdownOpen] = useState(false);
+  const [isRenderDropdownOpen, setIsRenderDropdownOpen] = useState(false);
   const [isLightingDropdownOpen, setIsLightingDropdownOpen] = useState(false);
-
-  // --- CLICK-ONLY SUBMENU STATES ---
-  // Replaced hover logic with strict click logic for stability
-  const [lockedRenderCategory, setLockedRenderCategory] = useState<string | null>(null);
-  const [lockedLightingCategory, setLockedLightingCategory] = useState<string | null>(null);
-  const [lockedArchCategory, setLockedArchCategory] = useState<string | null>(null); // New for Arch Styles
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const [draggingItem, setDraggingItem] = useState<any | null>(null);
-
-  // Reset locks when main dropdown closes
-  useEffect(() => {
-      if (!isRenderEngineDropdownOpen) {
-          setLockedRenderCategory(null);
-      }
-  }, [isRenderEngineDropdownOpen]);
-
-  useEffect(() => {
-      if (!isLightingDropdownOpen) {
-          setLockedLightingCategory(null);
-      }
-  }, [isLightingDropdownOpen]);
-
-  useEffect(() => {
-      if (!isArchDropdownOpen) {
-          setLockedArchCategory(null);
-      }
-  }, [isArchDropdownOpen]);
 
   // --- SECURITY: REACT INTEGRITY CHECK ---
   useEffect(() => {
@@ -1409,12 +1395,23 @@ const App: React.FC = () => {
       if (ratioDropdownRef.current && !ratioDropdownRef.current.contains(event.target as Node)) setIsRatioDropdownOpen(false);
       if (countDropdownRef.current && !countDropdownRef.current.contains(event.target as Node)) setIsCountDropdownOpen(false);
       if (qualityDropdownRef.current && !qualityDropdownRef.current.contains(event.target as Node)) setIsQualityDropdownOpen(false);
-      if (renderEngineDropdownRef.current && !renderEngineDropdownRef.current.contains(event.target as Node)) setIsRenderEngineDropdownOpen(false);
-      if (lightingDropdownRef.current && !lightingDropdownRef.current.contains(event.target as Node)) setIsLightingDropdownOpen(false);
+      if (renderDropdownRef.current && !renderDropdownRef.current.contains(event.target as Node)) {
+          setIsRenderDropdownOpen(false);
+          setLockedRenderCategory(null);
+      }
+      if (lightingDropdownRef.current && !lightingDropdownRef.current.contains(event.target as Node)) {
+          setIsLightingDropdownOpen(false);
+          setLockedLightingCategory(null);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Close flyouts when main dropdown closes
+  useEffect(() => { if (!isArchDropdownOpen) setLockedArchCategory(null); }, [isArchDropdownOpen]);
+  useEffect(() => { if (!isRenderDropdownOpen) setLockedRenderCategory(null); }, [isRenderDropdownOpen]);
+  useEffect(() => { if (!isLightingDropdownOpen) setLockedLightingCategory(null); }, [isLightingDropdownOpen]);
 
   useEffect(() => {
     checkApiKey();
@@ -1555,7 +1552,7 @@ const App: React.FC = () => {
              else setReferenceImages(prev => [...prev, ...newImages]);
           }
         };
-        reader.readAsDataURL(file as any);
+        reader.readAsDataURL(file as Blob);
       });
     }
   };
@@ -1610,6 +1607,7 @@ const App: React.FC = () => {
     try {
       let typeForPrompt = selectedType;
       if (selectedType === MediaType.NONE && selectedArchStyle === ArchitectureStyle.NONE) typeForPrompt = MediaType.STANDARD;
+      // Pass the new arch settings
       const suggestion = await generatePromptFromImage(allContextImages, typeForPrompt, selectedArchStyle, selectedRenderEngine, selectedLighting);
       setPrompt(suggestion);
     } catch (err) { setError("Could not generate auto-prompt. Check API key."); } 
@@ -1621,6 +1619,7 @@ const App: React.FC = () => {
     if (!hasApiKey) { await handleApiKeySelect(); if (!hasApiKey) return; }
     setIsEnhancing(true);
     try {
+      // Pass the new arch settings
       const enhanced = await enhanceUserPrompt(prompt, selectedType, selectedArchStyle, selectedRenderEngine, selectedLighting);
       setPrompt(enhanced);
     } catch (err) { setError("Could not enhance prompt."); } 
@@ -1710,8 +1709,8 @@ const App: React.FC = () => {
           referenceImages, 
           selectedArchStyle, 
           selectedQuality, 
-          selectedRenderEngine,
-          selectedLighting,
+          selectedRenderEngine, // Pass engine
+          selectedLighting, // Pass lighting
           controller.signal, 
           (url, index) => {
             setGeneratedImages(prev => {
@@ -1784,10 +1783,13 @@ const App: React.FC = () => {
   const isRatioActive = selectedAspectRatio !== '';
   const isCountActive = imageCount !== 0;
   const isQualityActive = isQualitySet; 
+  const isRenderEngineActive = selectedRenderEngine !== RenderEngine.DEFAULT;
+  const isLightingActive = selectedLighting !== LightingSetting.DEFAULT;
 
   // Updated Active Style to Teal/Gold
-  const activeButtonStyle = "bg-[#1e293b] border-white text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] ring-1 ring-white/40";
-  const inactiveButtonStyle = "bg-white/5 border-white/10 hover:bg-white/10 text-white/60";
+  const activeButtonStyle = "bg-[#103742]/30 border-[#e2b36e] text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] ring-1 ring-[#e2b36e]/40";
+  // Updated Inactive Style to make text fully opaque but still distinct (No opacity on text)
+  const inactiveButtonStyle = "bg-[#e2b36e]/5 border-[#e2b36e]/10 hover:bg-[#e2b36e]/10 text-[#e2b36e]";
   
   // --- NEW SECURITY HANDLER FOR EDIT BUTTON CLICK ---
   const handleValidateAccess = (): boolean => {
@@ -1795,7 +1797,7 @@ const App: React.FC = () => {
         setError("Access Denied: Please enter System Node Key");
         return false;
     }
-    if (accessKey.trim() !== 'ASTRA777') {
+    if (accessKey.trim() !== 'KAT777') {
         setError("Invalid Access Code");
         return false;
     }
@@ -1803,7 +1805,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full relative bg-[#0f172a] selection:bg-white selection:text-[#0f172a] flex flex-col">
+    <div className="min-h-screen w-full relative bg-[#103742] selection:bg-[#e2b36e] selection:text-[#103742] flex flex-col">
       {previewImage && (
         <FullScreenViewer 
             src={previewImage} 
@@ -1851,10 +1853,10 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* BACKGROUND UPDATE - NAVY THEME */}
+      {/* BACKGROUND UPDATE - KATINAT COLORS (DEEP TEAL) */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none transform-gpu translate-z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-[#1e3a8a] via-[#172554] to-[#0f172a] blur-[120px] opacity-40 will-change-transform"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-[#3b82f6] via-[#60a5fa] to-[#0f172a] blur-[120px] opacity-20 will-change-transform"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-[#1c4e5f] via-[#103742] to-[#09232b] blur-[120px] opacity-40 will-change-transform"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-[#e2b36e] via-[#b28e67] to-[#103742] blur-[120px] opacity-20 will-change-transform"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-black/40 blur-[80px]"></div>
         <div className="absolute inset-0 backdrop-blur-[60px]"></div>
         <div className="absolute inset-0 z-0 opacity-50 mix-blend-overlay" style={{backgroundImage: `repeating-linear-gradient(90deg,rgba(255,255,255,0) 0px,rgba(255,255,255,0.1) 10px,rgba(255,255,255,0.2) 15px,rgba(255,255,255,0.1) 20px,rgba(255,255,255,0) 30px,rgba(0,0,0,0.2) 40px,rgba(0,0,0,0.5) 45px,rgba(0,0,0,0.2) 50px,rgba(0,0,0,0) 60px)`}}></div>
@@ -1866,11 +1868,11 @@ const App: React.FC = () => {
           {/* Reduced side padding to make content wider */}
           <div className="w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex items-center gap-3">
               <div className="relative h-16 w-auto flex-none">
-                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.15)_0%,_transparent_70%)] blur-xl"></div>
+                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(226,179,10,0.15)_0%,_transparent_70%)] blur-xl"></div>
                    <img 
                     src="https://drive.google.com/thumbnail?id=1LgeMCeo2P5G2ex6Vo9ONZMBVgEA9kGGR&sz=w500" 
                     alt="ASTRA Logo"
-                    className="h-full w-auto object-contain relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                    className="h-full w-auto object-contain relative z-10 drop-shadow-[0_0_15px_rgba(226,179,110,0.2)]"
                     onContextMenu={(e) => e.preventDefault()}
                     draggable={false}
                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -1886,32 +1888,45 @@ const App: React.FC = () => {
       {/* MAIN CONTAINER: Flex-1 to fill space, items-stretch to equal height columns. min-h pushes footer below fold. pb-24 adds breathing room. */}
       <div className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex flex-col lg:flex-row gap-16 relative z-10 items-stretch min-h-[calc(100vh-7rem)] pb-24">
           
-          {/* LEFT TOOL COLUMN: Flex column to stretch vertically. Z-INDEX 50 TO STAY ON TOP OF PREVIEW */}
-          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex flex-col p-5 lg:p-6 h-full relative z-50">
+          {/* LEFT TOOL COLUMN: Flex column to stretch vertically. Z-INDEX 20 to stay above Right Column */}
+          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex flex-col p-5 lg:p-6 h-full z-20">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 flex-none">
                    <div className="relative" ref={typeDropdownRef}>
-                    <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isGraphicModeActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'text-white/60'}`}><Palette size={12} /> Graphic Design Mode</label>
-                    <button onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isGraphicModeActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedType === MediaType.NONE ? 'Select Type' : selectedType}</span></div><ChevronDown size={14} className={isGraphicModeActive ? 'text-white' : 'text-white/30'} /></button>
+                    <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isGraphicModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/60'}`}><Palette size={12} /> Graphic Design Mode</label>
+                    <button onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isGraphicModeActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                      <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                        <span className={`truncate text-sm font-medium ${selectedType === MediaType.NONE ? 'opacity-50' : ''}`}>{selectedType === MediaType.NONE ? 'Select Type' : selectedType}</span>
+                      </div>
+                      <ChevronDown size={14} className={isGraphicModeActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                    </button>
                     {isTypeDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden max-h-60 overflow-y-auto p-1">
-                        {Object.values(MediaType).filter(type => type !== MediaType.NONE).map((type) => (<button key={type} onClick={() => handleTypeSelect(type)} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedType === type && isGraphicModeActive ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}>{getTypeIcon(type)} <span>{type}</span></button>))}
+                      <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden max-h-60 overflow-y-auto p-1">
+                        {Object.values(MediaType).filter(type => type !== MediaType.NONE).map((type) => (<button key={type} onClick={() => handleTypeSelect(type)} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedType === type && isGraphicModeActive ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}>{getTypeIcon(type)} <span>{type}</span></button>))}
                       </div>
                     )}
                    </div>
                    <div className="relative" ref={archDropdownRef}>
-                    <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isArchModeActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'text-white/60'}`}><Building2 size={12} /> Architecture Render Mode</label>
-                    <button onClick={() => setIsArchDropdownOpen(!isArchDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isArchModeActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedArchStyle === ArchitectureStyle.NONE ? 'Select Style' : selectedArchStyle}</span></div><ChevronDown size={14} className={isArchModeActive ? 'text-white' : 'text-white/30'} /></button>
+                    <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isArchModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/60'}`}><Building2 size={12} /> Architecture Render Mode</label>
+                    <button onClick={() => setIsArchDropdownOpen(!isArchDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isArchModeActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                      <div className="flex items-center gap-2 truncate flex-1 min-w-0 text-left">
+                        <div className={`w-full text-sm font-medium text-left ${selectedArchStyle === ArchitectureStyle.NONE ? 'opacity-50' : ''}`}>
+                            {selectedArchStyle === ArchitectureStyle.NONE ? 'Select Style' : <ScrollableText text={selectedArchStyle} />}
+                        </div>
+                      </div>
+                      <ChevronDown size={14} className={isArchModeActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                    </button>
                     {isArchDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
+                      <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
                         {/* STANDARD - Standalone (Top) */}
                         <button 
                             onClick={() => handleArchSelect(ArchitectureStyle.STANDARD)} 
-                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mb-1 ${selectedArchStyle === ArchitectureStyle.STANDARD ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}
+                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mb-1 ${selectedArchStyle === ArchitectureStyle.STANDARD ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
                         >
                             <span className="font-medium">Standard</span>
                         </button>
+                        <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
 
-                        {/* GROUPS */}
+                        {/* GROUPS - Side Flyout */}
                         {Object.entries(ARCH_STYLE_GROUPS).map(([category, styles]) => {
                             const isActive = lockedArchCategory === category;
                             return (
@@ -1921,32 +1936,33 @@ const App: React.FC = () => {
                                         e.stopPropagation(); 
                                         setLockedArchCategory(isActive ? null : category); // Click to toggle
                                     }}
-                                    className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm transition-colors ${isActive ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/10'}`}
+                                    className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm transition-colors ${isActive ? 'bg-[#e2b36e]/10 text-[#e2b36e]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
                                 >
-                                    <ScrollableText text={category} className="font-medium flex-1" />
-                                    <ChevronRight size={14} className={`transition-transform duration-200 opacity-50 flex-none ${isActive ? 'rotate-90' : ''}`} />
+                                    <div className="font-medium flex-1 min-w-0"><ScrollableText text={category} /></div>
+                                    <ChevronRight size={14} className={`transition-transform duration-200 opacity-70 ${isActive ? 'rotate-90' : ''}`} />
                                 </button>
                                 
                                 {/* FLYOUT SUB-MENU */}
-                                <div className={`absolute left-full top-0 ml-2 w-48 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] ${isActive ? 'block' : 'hidden'}`}>
+                                <div className={`absolute left-full top-0 ml-2 w-48 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] max-h-[320px] overflow-y-auto custom-scrollbar animate-in slide-in-from-left-2 fade-in duration-200 ${isActive ? 'block' : 'hidden'}`}>
                                     {styles.map((style) => (
                                         <button 
                                             key={style} 
                                             onClick={() => handleArchSelect(style)} 
-                                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedArchStyle === style ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}
+                                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedArchStyle === style ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
                                         >
-                                            <span className={`w-1.5 h-1.5 rounded-full flex-none ${selectedArchStyle === style ? 'bg-white' : 'bg-white/20'}`} />
-                                            <ScrollableText text={style} className="font-medium flex-1" />
+                                            <span className={`w-1.5 h-1.5 rounded-full flex-none ${selectedArchStyle === style ? 'bg-[#e2b36e]' : 'bg-[#e2b36e]/20'}`} />
+                                            <div className="font-medium flex-1 min-w-0"><ScrollableText text={style} /></div>
                                         </button>
                                     ))}
                                 </div>
                             </div>
                         )})}
 
+                        <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
                         {/* OTHERS - Standalone (Bottom) */}
                         <button 
                             onClick={() => handleArchSelect(ArchitectureStyle.OTHERS)} 
-                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mt-1 ${selectedArchStyle === ArchitectureStyle.OTHERS ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}
+                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mt-1 ${selectedArchStyle === ArchitectureStyle.OTHERS ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
                         >
                             <span className="font-medium">Others</span>
                         </button>
@@ -1957,147 +1973,190 @@ const App: React.FC = () => {
 
                 <div className="grid grid-cols-3 gap-3 mb-6 flex-none">
                   <div className="relative" ref={ratioDropdownRef}>
-                     <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isRatioActive ? 'text-white' : 'text-white/60'}`}><Ratio size={10} /> Ratio</label>
-                     <button onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRatioActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate">{isRatioActive && <RatioIcon ratio={selectedAspectRatio} />}<span className="truncate text-sm font-medium">{isRatioActive ? ASPECT_RATIOS.find(r => r.value === selectedAspectRatio)?.label : 'Select'}</span></div><ChevronDown size={14} className={isRatioActive ? 'text-white' : 'text-white/30'} /></button>
+                     <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isRatioActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Ratio size={10} /> Ratio</label>
+                     <button onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRatioActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                      <div className="flex items-center gap-2 truncate">
+                        {isRatioActive && <RatioIcon ratio={selectedAspectRatio} />}
+                        <span className={`truncate text-sm font-medium ${!isRatioActive ? 'opacity-50' : ''}`}>{isRatioActive ? ASPECT_RATIOS.find(r => r.value === selectedAspectRatio)?.label : 'Select'}</span>
+                      </div>
+                      <ChevronDown size={14} className={isRatioActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                    </button>
                       {isRatioDropdownOpen && (
-                        <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[120px]">{ASPECT_RATIOS.map((ratio) => (<button key={ratio.value} onClick={() => { setSelectedAspectRatio(ratio.value); setIsRatioAuto(false); setIsRatioDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm ${selectedAspectRatio === ratio.value ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}><div className="flex items-center gap-2"><RatioIcon ratio={ratio.value} /><span>{ratio.label}</span></div></button>))}</div>
+                        <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[120px]">{ASPECT_RATIOS.map((ratio) => (<button key={ratio.value} onClick={() => { setSelectedAspectRatio(ratio.value); setIsRatioAuto(false); setIsRatioDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm ${selectedAspectRatio === ratio.value ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}><div className="flex items-center gap-2"><RatioIcon ratio={ratio.value} /><span>{ratio.label}</span></div></button>))}</div>
                       )}
                   </div>
                   <div className="relative" ref={countDropdownRef}>
-                     <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isCountActive ? 'text-white' : 'text-white/60'}`}><Layers size={10} /> Count</label>
-                     <button onClick={() => setIsCountDropdownOpen(!isCountDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isCountActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{isCountActive ? `${imageCount}` : 'Select'}</span></div><ChevronDown size={14} className={isCountActive ? 'text-white' : 'text-white/30'} /></button>
+                     <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isCountActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Layers size={10} /> Count</label>
+                     <button onClick={() => setIsCountDropdownOpen(!isCountDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isCountActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                        <div className="flex items-center gap-2 truncate">
+                          <span className={`truncate text-sm font-medium ${!isCountActive ? 'opacity-50' : ''}`}>{isCountActive ? `${imageCount}` : 'Select'}</span>
+                        </div>
+                        <ChevronDown size={14} className={isCountActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                     </button>
                       {isCountDropdownOpen && (
-                        <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[100px]">{[1, 2, 4].map((count) => (<button key={count} onClick={() => { setImageCount(count); setIsCountAuto(false); setIsCountDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${imageCount === count ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}><span className="font-bold">{count}</span><span className="opacity-70">Image{count > 1 ? 's' : ''}</span></button>))}</div>
+                        <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[100px]">{[1, 2, 4].map((count) => (<button key={count} onClick={() => { setImageCount(count); setIsCountAuto(false); setIsCountDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${imageCount === count ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}><span className="font-bold">{count}</span><span className="opacity-70">Image{count > 1 ? 's' : ''}</span></button>))}</div>
                       )}
                   </div>
                   <div className="relative" ref={qualityDropdownRef}>
-                     <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isQualityActive ? 'text-white' : 'text-white/60'}`}><Sparkles size={10} /> Quality</label>
-                     <button onClick={() => setIsQualityDropdownOpen(!isQualityDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isQualityActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{!isQualitySet ? 'Select' : selectedQuality}</span></div><ChevronDown size={14} className={isQualityActive ? 'text-white' : 'text-white/30'} /></button>
+                     <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isQualityActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Sparkles size={10} /> Quality</label>
+                     <button onClick={() => setIsQualityDropdownOpen(!isQualityDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isQualityActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                        <div className="flex items-center gap-2 truncate">
+                          <span className={`truncate text-sm font-medium ${!isQualitySet ? 'opacity-50' : ''}`}>{!isQualitySet ? 'Select' : selectedQuality}</span>
+                        </div>
+                        <ChevronDown size={14} className={isQualityActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                     </button>
                       {isQualityDropdownOpen && (
-                        <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[120px]">{Object.values(ImageQuality).map((q) => (<button key={q} onClick={() => { setSelectedQuality(q); setIsQualitySet(true); setIsQualityAuto(false); setIsQualityDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedQuality === q ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}><span className="font-medium">{q}</span></button>))}</div>
+                        <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[120px]">{Object.values(ImageQuality).map((q) => (<button key={q} onClick={() => { setSelectedQuality(q); setIsQualitySet(true); setIsQualityAuto(false); setIsQualityDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedQuality === q ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}><span className="font-medium">{q}</span></button>))}</div>
                       )}
                   </div>
                 </div>
 
-                {/* --- RENDER ENGINE & LIGHTING (ARCH MODE ONLY) --- */}
+                {/* --- NESTED DROPDOWNS FOR ENGINE & LIGHTING --- */}
                 {isArchModeActive && (
-                    <div className="grid grid-cols-2 gap-3 mb-6 flex-none animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="relative" ref={renderEngineDropdownRef}>
-                            <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${selectedRenderEngine !== RenderEngine.DEFAULT ? 'text-white' : 'text-white/60'}`}><Cpu size={10} /> Render Engine</label>
-                            <button onClick={() => setIsRenderEngineDropdownOpen(!isRenderEngineDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${selectedRenderEngine !== RenderEngine.DEFAULT ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedRenderEngine}</span></div><ChevronDown size={14} className={selectedRenderEngine !== RenderEngine.DEFAULT ? 'text-white' : 'text-white/30'} /></button>
-                            {isRenderEngineDropdownOpen && (
-                                <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
-                                    <button 
-                                      onClick={() => { setSelectedRenderEngine(RenderEngine.DEFAULT); setIsRenderEngineDropdownOpen(false); }}
-                                      className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mb-1 ${selectedRenderEngine === RenderEngine.DEFAULT ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}
-                                    >
-                                        <span className="font-medium">Default</span>
-                                    </button>
-                                    
-                                    {Object.entries(ENGINE_GROUPS).map(([category, engines]) => {
-                                        const isActive = lockedRenderCategory === category;
-                                        return (
-                                        <div key={category} className="group/item relative">
-                                            <button 
-                                                onClick={(e) => { 
-                                                    e.stopPropagation(); 
-                                                    setLockedRenderCategory(isActive ? null : category); // Click to toggle
-                                                }}
-                                                className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm transition-colors ${isActive ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                                            >
-                                                <ScrollableText text={category} className="font-medium flex-1" />
-                                                <ChevronRight size={14} className={`transition-transform duration-200 opacity-50 flex-none ${isActive ? 'rotate-90' : ''}`} />
-                                            </button>
-                                            
-                                            {/* FLYOUT SUB-MENU - VISIBLE ON ACTIVE (CLICKED) */}
-                                            <div className={`absolute left-full top-0 ml-2 w-48 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] ${isActive ? 'block' : 'hidden'}`}>
-                                                {engines.map((engine) => (
-                                                    <button 
-                                                        key={engine} 
-                                                        onClick={() => { setSelectedRenderEngine(engine); setIsRenderEngineDropdownOpen(false); setLockedRenderCategory(null); }} 
-                                                        className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedRenderEngine === engine ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}
-                                                    >
-                                                        <ScrollableText text={engine} className="font-medium flex-1" />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )})}
+                  <div className="grid grid-cols-2 gap-3 mb-6 flex-none animate-in fade-in slide-in-from-top-4 duration-300">
+                      
+                      {/* RENDER ENGINE DROPDOWN */}
+                      <div className="relative" ref={renderDropdownRef}>
+                         <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isRenderEngineActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Cpu size={10} /> Render Engine</label>
+                         <button onClick={() => setIsRenderDropdownOpen(!isRenderDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRenderEngineActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                            <div className="flex items-center gap-2 truncate flex-1 min-w-0 text-left">
+                                <div className={`w-full text-sm font-medium text-left ${selectedRenderEngine === RenderEngine.DEFAULT ? 'opacity-50' : ''}`}>
+                                    {selectedRenderEngine === RenderEngine.DEFAULT ? 'Default' : <ScrollableText text={selectedRenderEngine} />}
                                 </div>
-                            )}
-                        </div>
-                        <div className="relative" ref={lightingDropdownRef}>
-                            <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${selectedLighting !== LightingSetting.DEFAULT ? 'text-white' : 'text-white/60'}`}><Sun size={10} /> Lighting</label>
-                            <button onClick={() => setIsLightingDropdownOpen(!isLightingDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${selectedLighting !== LightingSetting.DEFAULT ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedLighting}</span></div><ChevronDown size={14} className={selectedLighting !== LightingSetting.DEFAULT ? 'text-white' : 'text-white/30'} /></button>
-                            {isLightingDropdownOpen && (
-                                <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
-                                    <button 
-                                      onClick={() => { setSelectedLighting(LightingSetting.DEFAULT); setIsLightingDropdownOpen(false); }}
-                                      className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mb-1 ${selectedLighting === LightingSetting.DEFAULT ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}
-                                    >
-                                        <span className="font-medium">Default</span>
-                                    </button>
+                            </div>
+                            <ChevronDown size={14} className={isRenderEngineActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                         </button>
+                          {isRenderDropdownOpen && (
+                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
+                                {/* Default Option - Text Opaque */}
+                                <button 
+                                    onClick={() => { setSelectedRenderEngine(RenderEngine.DEFAULT); setIsRenderDropdownOpen(false); }} 
+                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedRenderEngine === RenderEngine.DEFAULT ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] font-medium hover:bg-[#e2b36e]/10'}`}
+                                >
+                                    <span>Default</span>
+                                </button>
+                                <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
+                                
+                                {/* Side Flyout Style Categories */}
+                                {Object.entries(ENGINE_CATEGORIES).map(([category, engines]) => {
+                                    const isActive = lockedRenderCategory === category;
+                                    return (
+                                    <div key={category} className="group/item relative">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setLockedRenderCategory(isActive ? null : category); }}
+                                            className={`w-full p-2 rounded flex items-center justify-between text-left text-sm transition-colors ${isActive ? 'bg-[#e2b36e]/10 text-[#e2b36e]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                        >
+                                            <div className="font-medium flex-1 min-w-0"><ScrollableText text={category} /></div>
+                                            <ChevronRight size={14} className={`transition-transform duration-200 opacity-70 ${isActive ? 'rotate-90' : ''}`} />
+                                        </button>
+                                        
+                                        {/* Side Flyout Panel */}
+                                        <div className={`absolute left-full top-0 ml-2 w-48 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] max-h-[320px] overflow-y-auto custom-scrollbar animate-in slide-in-from-left-2 fade-in duration-200 ${isActive ? 'block' : 'hidden'}`}>
+                                            {engines.map((eng) => (
+                                                <button 
+                                                    key={eng} 
+                                                    onClick={() => { setSelectedRenderEngine(eng); setIsRenderDropdownOpen(false); }} 
+                                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedRenderEngine === eng ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                                >
+                                                    {/* REMOVED DOT FOR ENGINE */}
+                                                    <div className="flex-1 min-w-0"><ScrollableText text={eng} /></div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )})}
+                            </div>
+                          )}
+                      </div>
 
-                                    {Object.entries(LIGHTING_GROUPS).map(([category, options]) => {
-                                        const isActive = lockedLightingCategory === category;
-                                        return (
-                                        <div key={category} className="group/item relative">
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setLockedLightingCategory(isActive ? null : category); // Click to toggle
-                                                }}
-                                                className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm transition-colors ${isActive ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                                            >
-                                                <ScrollableText text={category} className="font-medium flex-1" />
-                                                <ChevronRight size={14} className={`transition-transform duration-200 opacity-50 flex-none ${isActive ? 'rotate-90' : ''}`} />
-                                            </button>
-                                            
-                                            {/* FLYOUT SUB-MENU - VISIBLE ON ACTIVE (CLICKED) */}
-                                            <div className={`absolute left-full top-0 ml-2 w-48 bg-[#0f172a]/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] ${isActive ? 'block' : 'hidden'}`}>
-                                                {options.map((option) => (
-                                                    <button 
-                                                        key={option} 
-                                                        onClick={() => { setSelectedLighting(option); setIsLightingDropdownOpen(false); setLockedLightingCategory(null); }} 
-                                                        className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedLighting === option ? 'bg-white/20 text-white font-bold' : 'text-white/60 hover:bg-white/10'}`}
-                                                    >
-                                                        <ScrollableText text={option} className="font-medium flex-1" />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )})}
+                      {/* LIGHTING DROPDOWN */}
+                      <div className="relative" ref={lightingDropdownRef}>
+                         <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isLightingActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Sun size={10} /> Lighting</label>
+                         <button onClick={() => setIsLightingDropdownOpen(!isLightingDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isLightingActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                            <div className="flex items-center gap-2 truncate flex-1 min-w-0 text-left">
+                                <div className={`w-full text-sm font-medium text-left ${selectedLighting === LightingSetting.DEFAULT ? 'opacity-50' : ''}`}>
+                                    {selectedLighting === LightingSetting.DEFAULT ? 'Default' : <ScrollableText text={selectedLighting} />}
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                            </div>
+                            <ChevronDown size={14} className={isLightingActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                         </button>
+                          {isLightingDropdownOpen && (
+                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
+                                {/* Default Option - Text Opaque */}
+                                <button 
+                                    onClick={() => { setSelectedLighting(LightingSetting.DEFAULT); setIsLightingDropdownOpen(false); }} 
+                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedLighting === LightingSetting.DEFAULT ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] font-medium hover:bg-[#e2b36e]/10'}`}
+                                >
+                                    <span>Default</span>
+                                </button>
+                                <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
+                                
+                                {/* Side Flyout Style Categories */}
+                                {Object.entries(LIGHTING_CATEGORIES).map(([category, lights]) => {
+                                    const isActive = lockedLightingCategory === category;
+                                    return (
+                                    <div key={category} className="mb-1 relative group">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setLockedLightingCategory(isActive ? null : category); }}
+                                            className={`w-full p-2 rounded flex items-center justify-between text-left text-sm transition-colors ${isActive ? 'bg-[#e2b36e]/10 text-[#e2b36e]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                        >
+                                            <div className="font-medium flex-1 min-w-0"><ScrollableText text={category} /></div>
+                                            <ChevronRight size={14} className={`transition-transform duration-200 opacity-70 ${isActive ? 'rotate-90' : ''}`} />
+                                        </button>
+                                        
+                                        {/* Side Flyout Panel */}
+                                        <div className={`absolute left-full top-0 ml-2 w-48 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] max-h-[320px] overflow-y-auto custom-scrollbar animate-in slide-in-from-left-2 fade-in duration-200 ${isActive ? 'block' : 'hidden'}`}>
+                                            {lights.map((l) => (
+                                                <button 
+                                                    key={l} 
+                                                    onClick={() => { setSelectedLighting(l); setIsLightingDropdownOpen(false); }} 
+                                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedLighting === l ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                                >
+                                                    {/* REMOVED DOT FOR LIGHTING */}
+                                                    <div className="flex-1 min-w-0"><ScrollableText text={l} /></div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )})}
+                            </div>
+                          )}
+                      </div>
+                  </div>
                 )}
 
                 <div className="flex flex-col gap-4 mb-6 mt-4 flex-none">
-                   <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-white bg-white/10' : 'border-white/20 bg-white/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'reference')}>
-                    <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-white flex items-center gap-1.5"><CopyPlus size={12} /> References</label><span className="text-[10px] text-white/50">{referenceImages.length}/20</span></div>
-                    <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => refInputRef.current?.click()} disabled={referenceImages.length >= 20} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${referenceImages.length >= 20 ? 'opacity-50 cursor-not-allowed' : 'border-white/30 text-white hover:bg-white/10'}`}><Plus size={20} /></button><input type="file" ref={refInputRef} className="hidden" onChange={handleRefUpload} accept="image/*" multiple />{referenceImages.map((img, index) => (<div key={`ref-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'reference', index)}><div className="h-full w-full rounded overflow-hidden border border-white/30 relative"><img src={img} alt={`Ref ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('ref'); }} className="p-1 hover:text-white text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('ref', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
-                    <div className="mt-1 text-[10px] text-white/40 text-center italic select-none">Upload images here to use as Reference</div>
+                   <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-[#e2b36e] bg-[#e2b36e]/10' : 'border-[#e2b36e]/20 bg-[#e2b36e]/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'reference')}>
+                    <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-[#e2b36e] flex items-center gap-1.5"><CopyPlus size={12} /> References</label><span className="text-[10px] text-[#e2b36e]/50">{referenceImages.length}/20</span></div>
+                    <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => refInputRef.current?.click()} disabled={referenceImages.length >= 20} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${referenceImages.length >= 20 ? 'opacity-50 cursor-not-allowed' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}><Plus size={20} /></button><input type="file" ref={refInputRef} className="hidden" onChange={handleRefUpload} accept="image/*" multiple />{referenceImages.map((img, index) => (<div key={`ref-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'reference', index)}><div className="h-full w-full rounded overflow-hidden border border-[#e2b36e]/30 relative"><img src={img} alt={`Ref ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('ref'); }} className="p-1 hover:text-[#e2b36e] text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('ref', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
+                    <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Upload images here to use as Reference</div>
                   </div>
-                  <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-white bg-white/10' : 'border-white/20 bg-white/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'input')}>
-                    <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-white flex items-center gap-1.5"><ImageIcon size={12} /> {isArchModeActive ? 'Input Images' : 'Input Image'}</label><span className="text-[10px] text-white/50">{inputImages.length}/10</span></div>
-                    <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => inputInputRef.current?.click()} disabled={inputImages.length >= 10} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${inputImages.length >= 10 ? 'opacity-50 cursor-not-allowed' : 'border-white/30 text-white hover:bg-white/10'}`}><Plus size={20} /></button><input type="file" ref={inputInputRef} className="hidden" onChange={handleInputUpload} accept="image/*" multiple />{inputImages.map((img, index) => (<div key={`input-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'input', index)}><div className="h-full w-full rounded overflow-hidden border border-white/30 relative"><img src={img} alt={`Input ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('input'); }} className="p-1 hover:text-white text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('input', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
-                    <div className="mt-1 text-[10px] text-white/40 text-center italic select-none">Upload images here to use as Base</div>
+                  <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-[#e2b36e] bg-[#e2b36e]/10' : 'border-[#e2b36e]/20 bg-[#e2b36e]/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'input')}>
+                    <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-[#e2b36e] flex items-center gap-1.5"><ImageIcon size={12} /> {isArchModeActive ? 'Input Images' : 'Input Image'}</label><span className="text-[10px] text-[#e2b36e]/50">{inputImages.length}/10</span></div>
+                    <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => inputInputRef.current?.click()} disabled={inputImages.length >= 10} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${inputImages.length >= 10 ? 'opacity-50 cursor-not-allowed' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}><Plus size={20} /></button><input type="file" ref={inputInputRef} className="hidden" onChange={handleInputUpload} accept="image/*" multiple />{inputImages.map((img, index) => (<div key={`input-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'input', index)}><div className="h-full w-full rounded overflow-hidden border border-[#e2b36e]/30 relative"><img src={img} alt={`Input ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('input'); }} className="p-1 hover:text-[#e2b36e] text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('input', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
+                    <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Upload images here to use as Base</div>
                   </div>
                 </div>
 
                 {/* PROMPT AREA - FLEX-1 TO GROW VERTICALLY */}
                 <div className="flex-1 flex flex-col gap-2 mb-6 min-h-[150px]">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-semibold text-white">Prompt</label>
+                    <label className="text-xs font-semibold text-[#e2b36e]">Prompt</label>
                     {(inputImages.length > 0 || referenceImages.length > 0) && (
-                        <button onClick={handleAutoPrompt} disabled={isAutoPrompting} className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg ${isAutoPrompting ? 'bg-[#1e293b] text-white cursor-wait' : 'bg-white/20 text-white border border-white/30 hover:bg-white/30'}`}><Sparkles size={10} className={isAutoPrompting ? "animate-spin" : ""} />{isAutoPrompting ? 'Reading...' : 'Auto Prompt'}</button>
+                        <button onClick={handleAutoPrompt} disabled={isAutoPrompting} className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg ${isAutoPrompting ? 'bg-[#103742] text-[#e2b36e] cursor-wait' : 'bg-[#e2b36e]/20 text-[#e2b36e] border border-[#e2b36e]/30 hover:bg-[#e2b36e]/30'}`}><Sparkles size={10} className={isAutoPrompting ? "animate-spin" : ""} />{isAutoPrompting ? 'Reading...' : 'Auto Prompt'}</button>
                     )}
                   </div>
-                  <div className="relative flex-1 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 focus-within:bg-white/10 focus-within:ring-1 focus-within:ring-white/30 transition-all group overflow-hidden">
-                    <textarea ref={textAreaRef} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={isArchModeActive ? "Describe the materials, lighting... Paste images here to upload!" : "Describe your concept... Paste images here directly!"} className="w-full h-full bg-transparent border-none p-4 text-white placeholder-white/30 focus:outline-none resize-none text-sm leading-relaxed custom-scrollbar pb-12 rounded-lg" />
+                  {/* WRAPPER: Holds Border/Bg to ensure absolute button stays inside visible frame */}
+                  <div className="relative flex-1 bg-[#e2b36e]/5 border border-[#e2b36e]/10 rounded-lg transition-all focus-within:ring-2 focus-within:ring-[#e2b36e]/50 focus-within:bg-[#e2b36e]/10">
+                    <textarea 
+                        ref={textAreaRef} 
+                        value={prompt} 
+                        onChange={(e) => setPrompt(e.target.value)} 
+                        placeholder={isArchModeActive ? "Describe the materials, lighting... Paste images here to upload!" : "Describe your concept... Paste images here directly!"} 
+                        className="w-full h-full bg-transparent border-none p-4 text-[#e2b36e] placeholder-[#e2b36e]/30 focus:outline-none focus:ring-0 resize-none text-sm leading-relaxed custom-scrollbar pb-12" 
+                    />
                     {prompt.trim() && (
-                      <button onClick={handleEnhancePrompt} disabled={isEnhancing} className={`absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 z-10 max-w-full ${isEnhancing ? 'bg-slate-900 border border-white/10 text-white/30 cursor-wait shadow-none' : 'bg-[#1e293b] border border-white/30 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] hover:bg-[#334155]'}`}><Wand2 size={11} className={isEnhancing ? "animate-spin" : "fill-white/50"} />{isEnhancing ? 'Enhancing...' : 'Enhance'}</button>
+                      <button onClick={handleEnhancePrompt} disabled={isEnhancing} className={`absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 z-10 ${isEnhancing ? 'bg-slate-900 border border-white/10 text-white/30 cursor-wait shadow-none' : 'bg-[#103742] border border-[#e2b36e]/30 text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] hover:shadow-[0_0_25px_rgba(226,179,110,0.4)] hover:bg-[#0c2e38]'}`}><Wand2 size={11} className={isEnhancing ? "animate-spin" : "fill-[#e2b36e]/50"} />{isEnhancing ? 'Enhancing...' : 'Enhance'}</button>
                     )}
                   </div>
                 </div>
@@ -2105,8 +2164,8 @@ const App: React.FC = () => {
                 {/* HIDDEN ACCESS KEY & DRIVE CONFIG */}
                 <div className="flex-none mb-6">
                     <div className="flex items-center gap-2 mb-1.5">
-                       <ShieldCheck size={11} className="text-white/40" />
-                       <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">System Node Access</span>
+                       <ShieldCheck size={11} className="text-[#e2b36e]/40" />
+                       <span className="text-[10px] font-bold uppercase tracking-widest text-[#e2b36e]/40">System Node Access</span>
                     </div>
                     <div className="flex flex-col gap-2">
                         <input 
@@ -2114,7 +2173,7 @@ const App: React.FC = () => {
                           value={accessKey}
                           onChange={(e) => setAccessKey(e.target.value)}
                           placeholder="••••••••••"
-                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30 transition-colors placeholder-white/10"
+                          className="w-full bg-[#e2b36e]/5 border border-[#e2b36e]/10 rounded-lg px-3 py-2 text-sm text-[#e2b36e] focus:outline-none focus:border-[#e2b36e]/30 transition-colors placeholder-[#e2b36e]/10"
                         />
                     </div>
                 </div>
@@ -2133,7 +2192,7 @@ const App: React.FC = () => {
                          >
                             {loading ? (<><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="mr-2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>STOP</>) : (<>
                                 {/* REPLACED SVG WITH 4-POINTED STAR */}
-                                <svg width="20" height="20" viewBox="0 0 100 100" className="w-5 h-5 mr-2 text-white fill-current">
+                                <svg width="20" height="20" viewBox="0 0 100 100" className="w-5 h-5 mr-2 text-[#e2b36e] fill-current">
                                    <path d="M 50 0 C 50 35 60 45 100 50 C 60 55 50 65 50 100 C 50 65 40 55 0 50 C 40 45 50 35 50 0 Z" />
                                 </svg>
                                 {isArchModeActive ? 'Render Architecture' : 'Generate Design'}
@@ -2144,8 +2203,8 @@ const App: React.FC = () => {
                 </div>
           </GlassCard>
 
-          {/* RIGHT COLUMN: Flex column to stretch vertically. Z-INDEX 10 TO STAY BELOW FLYOUTS */}
-          <div className="w-full lg:flex-1 h-auto flex flex-col gap-6 min-w-0 relative z-10">
+          {/* RIGHT COLUMN: Flex column to stretch vertically. Z-INDEX 10 */}
+          <div className="w-full lg:flex-1 h-auto flex flex-col gap-6 min-w-0 z-10">
               {/* RESULT AREA: FLEX-1 to grow and fill vertical space. Min-height ensures it's never too small. */}
               <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[400px] shrink-0 rounded-2xl">
                   
@@ -2155,8 +2214,8 @@ const App: React.FC = () => {
                           <defs>
                               <radialGradient id="gradTL" cx="0" cy="0" r="120" gradientUnits="userSpaceOnUse">
                                   <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
-                                  <stop offset="20%" stopColor="#94a3b8" stopOpacity="0.6" />
-                                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                                  <stop offset="20%" stopColor="#e2b36e" stopOpacity="0.6" />
+                                  <stop offset="100%" stopColor="#e2b36e" stopOpacity="0" />
                               </radialGradient>
                           </defs>
                           <path 
@@ -2175,8 +2234,8 @@ const App: React.FC = () => {
                           <defs>
                               <radialGradient id="gradBR" cx="120" cy="120" r="120" gradientUnits="userSpaceOnUse">
                                   <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
-                                  <stop offset="20%" stopColor="#94a3b8" stopOpacity="0.6" />
-                                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                                  <stop offset="20%" stopColor="#e2b36e" stopOpacity="0.6" />
+                                  <stop offset="100%" stopColor="#e2b36e" stopOpacity="0" />
                               </radialGradient>
                           </defs>
                           <path 
@@ -2192,9 +2251,9 @@ const App: React.FC = () => {
                   <div className="absolute inset-6 flex items-center justify-center">
                       {generatedImages.length === 0 && !loading && (
                         <div className="text-center max-w-md mx-auto relative z-10 select-none">
-                          <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/20"><ImageIcon className="w-10 h-10 text-white/40" /></div>
-                          <h3 className="text-xl font-bold text-white mb-2 drop-shadow-md">Ready to Design</h3>
-                          <p className="text-white/60 mb-6 text-sm">Upload <strong>Input Images</strong> to transform, or <strong>References</strong> to guide style.</p>
+                          <div className="w-20 h-20 bg-[#e2b36e]/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-[#e2b36e]/20"><ImageIcon className="w-10 h-10 text-[#e2b36e]/40" /></div>
+                          <h3 className="text-xl font-bold text-[#e2b36e] mb-2 drop-shadow-md">Ready to Design</h3>
+                          <p className="text-[#e2b36e]/60 mb-6 text-sm">Upload <strong>Input Images</strong> to transform, or <strong>References</strong> to guide style.</p>
                         </div>
                       )}
                       {(loading || generatedImages.length > 0) && (
@@ -2203,20 +2262,20 @@ const App: React.FC = () => {
                              const completedUrl = generatedImages[i];
                              if (completedUrl) {
                                return (
-                                <div key={`img-${i}`} className="relative group/img rounded-xl overflow-hidden shadow-2xl w-full h-full border border-white/20 bg-black/20 animate-in fade-in zoom-in-95 duration-500">
+                                <div key={`img-${i}`} className="relative group/img rounded-xl overflow-hidden shadow-2xl w-full h-full border border-[#e2b36e]/20 bg-black/20 animate-in fade-in zoom-in-95 duration-500">
                                   <img src={completedUrl} alt={`Generated ${i}`} className="w-full h-full object-contain cursor-pointer select-none" draggable={false} onClick={() => { setPreviewImage(completedUrl); setPreviewSource('generated'); }} onContextMenu={(e) => e.preventDefault()} />
                                   <div className="absolute top-4 right-4 p-0 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 pointer-events-none">
-                                      <div className="bg-black/40 backdrop-blur-md border border-white/20 rounded-xl p-1.5 flex items-center gap-2 shadow-lg pointer-events-auto">
-                                          <button onClick={(e) => { e.stopPropagation(); setPreviewImage(completedUrl); setPreviewSource('generated'); }} className="p-1.5 hover:bg-white/20 rounded-lg text-white transition-colors" title="Edit Image"><Edit3 size={16} /></button>
-                                          <div className="w-[1px] h-4 bg-white/20"></div>
-                                          <button onClick={(e) => { e.stopPropagation(); handleDownload(completedUrl); }} className="p-1.5 hover:bg-white/20 rounded-lg text-white transition-colors" title="Download"><Download size={16} /></button>
+                                      <div className="bg-black/40 backdrop-blur-md border border-[#e2b36e]/20 rounded-xl p-1.5 flex items-center gap-2 shadow-lg pointer-events-auto">
+                                          <button onClick={(e) => { e.stopPropagation(); setPreviewImage(completedUrl); setPreviewSource('generated'); }} className="p-1.5 hover:bg-[#e2b36e]/20 rounded-lg text-[#e2b36e] transition-colors" title="Edit Image"><Edit3 size={16} /></button>
+                                          <div className="w-[1px] h-4 bg-[#e2b36e]/20"></div>
+                                          <button onClick={(e) => { e.stopPropagation(); handleDownload(completedUrl); }} className="p-1.5 hover:bg-[#e2b36e]/20 rounded-lg text-[#e2b36e] transition-colors" title="Download"><Download size={16} /></button>
                                       </div>
                                   </div>
                                 </div>
                                );
                              } else {
                                return (
-                                 <div key={`load-${i}`} className="relative bg-[#0f172a]/40 backdrop-blur-md rounded-2xl border border-white/20 flex items-center justify-center overflow-hidden"><AILoader progress={progress} small={imageCount > 1} /></div>
+                                 <div key={`load-${i}`} className="relative bg-[#103742]/40 backdrop-blur-md rounded-2xl border border-[#e2b36e]/20 flex items-center justify-center overflow-hidden"><AILoader progress={progress} small={imageCount > 1} /></div>
                                );
                              }
                            })}
@@ -2228,16 +2287,16 @@ const App: React.FC = () => {
               {/* HISTORY AREA: Fixed height to anchor the bottom. */}
               <GlassCard className="w-full flex-none h-40 min-h-[10rem] shrink-0 p-4 flex flex-col mb-8 lg:mb-0">
                   <div className="flex-none flex items-center justify-between mb-3">
-                     <div className="flex items-center gap-2 text-xs font-semibold text-white/60 uppercase tracking-widest"><HistoryIcon size={12} /> Recent Generations</div>
+                     <div className="flex items-center gap-2 text-xs font-semibold text-[#e2b36e]/60 uppercase tracking-widest"><HistoryIcon size={12} /> Recent Generations</div>
                      {history.length > 0 && (<button onClick={clearHistory} className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 hover:underline"><Trash2 size={10} /> Clear All</button>)}
                   </div>
                   <div className="flex-1 flex gap-4 overflow-x-auto custom-scrollbar pb-2 min-h-0">
-                    {history.length === 0 ? (<div className="w-full flex items-center justify-center text-white/30 text-xs italic">No history yet. Start creating!</div>) : (
+                    {history.length === 0 ? (<div className="w-full flex items-center justify-center text-[#e2b36e]/30 text-xs italic">No history yet. Start creating!</div>) : (
                         history.map((item) => (
-                        <div key={item.id} onClick={() => { setGeneratedImages([item.url]); setLoading(false); }} className="relative flex-none h-full aspect-square rounded-lg overflow-hidden border border-white/20 group hover:border-white transition-all cursor-pointer select-none" onContextMenu={(e) => e.preventDefault()}>
+                        <div key={item.id} onClick={() => { setGeneratedImages([item.url]); setLoading(false); }} className="relative flex-none h-full aspect-square rounded-lg overflow-hidden border border-[#e2b36e]/20 group hover:border-[#e2b36e] transition-all cursor-pointer select-none" onContextMenu={(e) => e.preventDefault()}>
                             <img src={item.url} alt="History" className="w-full h-full object-cover select-none" draggable={false} />
                             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); handleDownload(item.url); }} className="absolute top-1 left-1 p-1.5 bg-black/60 hover:bg-black/80 rounded-md text-white backdrop-blur-sm transition-colors" title="Download"><Download size={12}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDownload(item.url); }} className="absolute top-1 left-1 p-1.5 bg-black/60 hover:bg-black/80 rounded-md text-[#e2b36e] backdrop-blur-sm transition-colors" title="Download"><Download size={12}/></button>
                                 <button onClick={(e) => { e.stopPropagation(); deleteHistoryItem(item.id); }} className="absolute top-1 right-1 p-1.5 bg-red-500/80 hover:bg-red-600 rounded-md text-white backdrop-blur-sm transition-colors" title="Delete"><Trash2 size={12}/></button>
                             </div>
                         </div>))
@@ -2248,8 +2307,12 @@ const App: React.FC = () => {
       </div>
         
       {/* FOOTER: MT-AUTO pushes it to the bottom of flex container. */}
-      <footer className="flex-none w-full text-center py-6 mt-auto text-white/40 text-sm font-medium uppercase tracking-widest opacity-80 hover:opacity-100 transition-opacity duration-500 select-none flex flex-col items-center gap-3">
-          <span className="drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Powered by Eric</span>
+      <footer className="flex-none w-full text-center py-6 mt-auto text-[#e2b36e]/40 text-sm font-medium uppercase tracking-widest opacity-80 hover:opacity-100 transition-opacity duration-500 select-none flex flex-col items-center gap-3">
+          {/* ONLINE USER BADGE */}
+          <div className="scale-90 opacity-80 mb-1">
+             <OnlineUserCounter />
+          </div>
+          <span className="drop-shadow-[0_0_10px_rgba(226,179,110,0.1)]">Powered by Eric</span>
       </footer>
     </div>
   );
