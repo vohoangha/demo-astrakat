@@ -13,19 +13,38 @@ export enum MediaType {
 
 export enum ArchitectureStyle {
   NONE = 'None',
-  FRAME_HOUSE = 'Frame House',
-  FUTURISTIC = 'Futuristic',
-  INDOCHINE = 'Indochine',
-  INDUSTRIAL = 'Industrial',
-  JAPANDI = 'Japandi',
-  LUXURY = 'Luxury Contemporary',
-  MINIMALIST = 'Minimalist',
-  MODERN = 'Modern',
-  NEOCLASSIC = 'Neoclassical',
-  SCANDINAVIAN = 'Scandinavian',
   STANDARD = 'Standard',
-  TROPICAL = 'Tropical Resort',
+  
+  // Modern Group
+  MODERN = 'Modern',
+  MINIMALIST = 'Minimalist',
+  JAPANDI = 'Japandi',
   WABI_SABI = 'Wabi Sabi',
+  SCANDINAVIAN = 'Scandinavian',
+  MID_CENTURY = 'Mid-Century Modern',
+  BAUHAUS = 'Bauhaus',
+  LUXURY = 'Luxury Contemporary',
+
+  // Classic Group
+  NEOCLASSIC = 'Neoclassical',
+  INDOCHINE = 'Indochine',
+  MEDITERRANEAN = 'Mediterranean',
+  ART_DECO = 'Art Deco',
+  MOROCCAN = 'Moroccan',
+  VICTORIAN = 'Victorian',
+
+  // Rustic & Nature Group
+  TROPICAL = 'Tropical Resort',
+  FRAME_HOUSE = 'Frame House',
+  FARMHOUSE = 'Farmhouse',
+  BRUTALIST = 'Brutalist',
+  COTTAGECORE = 'Cottagecore',
+
+  // Industrial & Future Group
+  INDUSTRIAL = 'Industrial',
+  FUTURISTIC = 'Futuristic',
+  CYBERPUNK = 'Cyberpunk',
+
   OTHERS = 'Others'
 }
 
@@ -39,33 +58,47 @@ export enum ImageQuality {
 
 export enum RenderEngine {
   DEFAULT = 'Default',
+  // Interior focused (often used)
   BLENDER_CYCLES = 'Blender Cycles',
   CORONA = 'Corona Renderer',
-  D5 = 'D5 Render',
-  ENSCAPE = 'Enscape',
-  LUMION = 'Lumion',
   MARMOSET = 'Marmoset Toolbag',
   MAXWELL = 'Maxwell Render',
   OCTANE = 'Octane Render',
-  REDSHIFT = 'Redshift',
-  TWINMOTION = 'Twinmotion',
   UNREAL = 'Unreal Engine 5',
-  VRAY = 'V-Ray'
+  VRAY = 'V-Ray',
+  // Architecture/Exterior focused (realtime/large scale)
+  D5 = 'D5 Render',
+  ENSCAPE = 'Enscape',
+  LUMION = 'Lumion',
+  REDSHIFT = 'Redshift',
+  TWINMOTION = 'Twinmotion'
 }
 
 export enum LightingSetting {
   DEFAULT = 'Default',
-  BLUE_HOUR = 'Blue Hour',
-  CINEMATIC = 'Cinematic',
-  GOLDEN_HOUR = 'Golden Hour',
-  MOODY = 'Moody',
-  NEON = 'Neon/Cyberpunk',
-  NIGHT = 'Night',
-  NOON = 'Noon (Sunny)',
-  OVERCAST = 'Overcast',
-  STUDIO = 'Studio',
+  // Time of Day
   SUNRISE = 'Sunrise',
-  SUNSET = 'Sunset'
+  SUNNY_DAY = 'Sunny Day',
+  NOON = 'Noon',
+  GOLDEN_HOUR = 'Golden Hour',
+  BLUE_HOUR = 'Blue Hour',
+  NIGHT = 'Night',
+  
+  // Weather & Environment
+  OVERCAST = 'Overcast',
+  RAINY = 'Rainy',
+  SNOWY = 'Snowy',
+  FOGGY = 'Foggy/Misty',
+  
+  // Artificial & Indoor
+  WARM_INTERIOR = 'Warm Interior',
+  STUDIO = 'Studio',
+  NEON = 'Neon/Cyberpunk',
+  
+  // Mood & Artistic
+  CINEMATIC = 'Cinematic',
+  MOODY = 'Moody',
+  BIOLUMINESCENT = 'Bioluminescent'
 }
 
 export interface GeneratedImage {

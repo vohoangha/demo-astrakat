@@ -45,7 +45,9 @@ import {
   Send,
   Hand,
   Cpu,
-  Sun
+  Sun,
+  ChevronRight,
+  ChevronUp
 } from 'lucide-react';
 
 // ==========================================
@@ -75,6 +77,88 @@ const verifyAccess = async (key: string): Promise<boolean> => {
   if (!key) return false;
   return key.trim() === 'KAT777';
 };
+
+// --- ARCHITECTURE STYLE GROUPS DEFINITION (SORTED A-Z) ---
+const ARCH_STYLE_GROUPS = {
+  "Modern": [
+    ArchitectureStyle.BAUHAUS,
+    ArchitectureStyle.JAPANDI,
+    ArchitectureStyle.LUXURY,
+    ArchitectureStyle.MID_CENTURY,
+    ArchitectureStyle.MINIMALIST,
+    ArchitectureStyle.MODERN,
+    ArchitectureStyle.SCANDINAVIAN,
+    ArchitectureStyle.WABI_SABI
+  ].sort(),
+  "Classic": [
+    ArchitectureStyle.ART_DECO,
+    ArchitectureStyle.INDOCHINE,
+    ArchitectureStyle.MEDITERRANEAN,
+    ArchitectureStyle.MOROCCAN,
+    ArchitectureStyle.NEOCLASSIC,
+    ArchitectureStyle.VICTORIAN
+  ].sort(),
+  "Rustic & Nature": [
+    ArchitectureStyle.BRUTALIST,
+    ArchitectureStyle.COTTAGECORE,
+    ArchitectureStyle.FARMHOUSE,
+    ArchitectureStyle.FRAME_HOUSE,
+    ArchitectureStyle.TROPICAL
+  ].sort(),
+  "Industrial & Future": [
+    ArchitectureStyle.CYBERPUNK,
+    ArchitectureStyle.FUTURISTIC,
+    ArchitectureStyle.INDUSTRIAL
+  ].sort()
+};
+
+// --- DATA CONSTANTS FOR NESTED DROPDOWNS (Sorted A-Z) ---
+const ENGINE_CATEGORIES = {
+    "Interior": [
+        RenderEngine.BLENDER_CYCLES,
+        RenderEngine.CORONA,
+        RenderEngine.MARMOSET,
+        RenderEngine.MAXWELL,
+        RenderEngine.OCTANE,
+        RenderEngine.UNREAL,
+        RenderEngine.VRAY
+    ].sort(),
+    "Architecture": [
+        RenderEngine.D5,
+        RenderEngine.ENSCAPE,
+        RenderEngine.LUMION,
+        RenderEngine.REDSHIFT,
+        RenderEngine.TWINMOTION
+    ].sort()
+};
+
+const LIGHTING_CATEGORIES = {
+    "Time of Day": [
+        LightingSetting.BLUE_HOUR,
+        LightingSetting.GOLDEN_HOUR,
+        LightingSetting.NIGHT,
+        LightingSetting.NOON,
+        LightingSetting.SUNNY_DAY,
+        LightingSetting.SUNRISE
+    ].sort(),
+    "Weather & Environment": [
+        LightingSetting.FOGGY,
+        LightingSetting.OVERCAST,
+        LightingSetting.RAINY,
+        LightingSetting.SNOWY
+    ].sort(),
+    "Artificial & Indoor": [
+        LightingSetting.NEON,
+        LightingSetting.STUDIO,
+        LightingSetting.WARM_INTERIOR
+    ].sort(),
+    "Mood & Artistic": [
+        LightingSetting.BIOLUMINESCENT,
+        LightingSetting.CINEMATIC,
+        LightingSetting.MOODY
+    ].sort()
+};
+
 
 // --- REALTIME ONLINE COUNTER COMPONENT ---
 const OnlineUserCounter: React.FC = () => {
@@ -1201,6 +1285,11 @@ const App: React.FC = () => {
   // --- NEW ARCH STATES ---
   const [selectedRenderEngine, setSelectedRenderEngine] = useState<RenderEngine>(RenderEngine.DEFAULT);
   const [selectedLighting, setSelectedLighting] = useState<LightingSetting>(LightingSetting.DEFAULT);
+  
+  // --- ACCORDION STATES (Reused for Side Flyout Active State) ---
+  const [lockedRenderCategory, setLockedRenderCategory] = useState<string | null>(null);
+  const [lockedLightingCategory, setLockedLightingCategory] = useState<string | null>(null);
+  const [lockedArchCategory, setLockedArchCategory] = useState<string | null>(null);
 
   // --- AUTO-SELECT STATE TRACKING ---
   const [isRatioAuto, setIsRatioAuto] = useState(false);
@@ -1270,12 +1359,23 @@ const App: React.FC = () => {
       if (ratioDropdownRef.current && !ratioDropdownRef.current.contains(event.target as Node)) setIsRatioDropdownOpen(false);
       if (countDropdownRef.current && !countDropdownRef.current.contains(event.target as Node)) setIsCountDropdownOpen(false);
       if (qualityDropdownRef.current && !qualityDropdownRef.current.contains(event.target as Node)) setIsQualityDropdownOpen(false);
-      if (renderDropdownRef.current && !renderDropdownRef.current.contains(event.target as Node)) setIsRenderDropdownOpen(false);
-      if (lightingDropdownRef.current && !lightingDropdownRef.current.contains(event.target as Node)) setIsLightingDropdownOpen(false);
+      if (renderDropdownRef.current && !renderDropdownRef.current.contains(event.target as Node)) {
+          setIsRenderDropdownOpen(false);
+          setLockedRenderCategory(null);
+      }
+      if (lightingDropdownRef.current && !lightingDropdownRef.current.contains(event.target as Node)) {
+          setIsLightingDropdownOpen(false);
+          setLockedLightingCategory(null);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Close flyouts when main dropdown closes
+  useEffect(() => { if (!isArchDropdownOpen) setLockedArchCategory(null); }, [isArchDropdownOpen]);
+  useEffect(() => { if (!isRenderDropdownOpen) setLockedRenderCategory(null); }, [isRenderDropdownOpen]);
+  useEffect(() => { if (!isLightingDropdownOpen) setLockedLightingCategory(null); }, [isLightingDropdownOpen]);
 
   useEffect(() => {
     checkApiKey();
@@ -1640,7 +1740,7 @@ const App: React.FC = () => {
   };
 
   const handleTypeSelect = (type: MediaType) => { setSelectedType(type); setSelectedArchStyle(ArchitectureStyle.NONE); setIsTypeDropdownOpen(false); };
-  const handleArchSelect = (style: ArchitectureStyle) => { setSelectedArchStyle(style); setSelectedType(MediaType.NONE); setIsArchDropdownOpen(false); };
+  const handleArchSelect = (style: ArchitectureStyle) => { setSelectedArchStyle(style); setSelectedType(MediaType.NONE); setIsArchDropdownOpen(false); setLockedArchCategory(null); };
 
   const isGraphicModeActive = selectedType !== MediaType.NONE;
   const isArchModeActive = selectedArchStyle !== ArchitectureStyle.NONE;
@@ -1652,7 +1752,8 @@ const App: React.FC = () => {
 
   // Updated Active Style to Teal/Gold
   const activeButtonStyle = "bg-[#103742]/30 border-[#e2b36e] text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] ring-1 ring-[#e2b36e]/40";
-  const inactiveButtonStyle = "bg-[#e2b36e]/5 border-[#e2b36e]/10 hover:bg-[#e2b36e]/10 text-[#e2b36e]/60";
+  // Updated Inactive Style to make text fully opaque but still distinct (No opacity on text)
+  const inactiveButtonStyle = "bg-[#e2b36e]/5 border-[#e2b36e]/10 hover:bg-[#e2b36e]/10 text-[#e2b36e]";
   
   // --- NEW SECURITY HANDLER FOR EDIT BUTTON CLICK ---
   const handleValidateAccess = (): boolean => {
@@ -1751,12 +1852,17 @@ const App: React.FC = () => {
       {/* MAIN CONTAINER: Flex-1 to fill space, items-stretch to equal height columns. min-h pushes footer below fold. pb-24 adds breathing room. */}
       <div className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex flex-col lg:flex-row gap-16 relative z-10 items-stretch min-h-[calc(100vh-7rem)] pb-24">
           
-          {/* LEFT TOOL COLUMN: Flex column to stretch vertically */}
-          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex flex-col p-5 lg:p-6 h-full">
+          {/* LEFT TOOL COLUMN: Flex column to stretch vertically. Z-INDEX 20 to stay above Right Column */}
+          <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex flex-col p-5 lg:p-6 h-full z-20">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 flex-none">
                    <div className="relative" ref={typeDropdownRef}>
                     <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isGraphicModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/60'}`}><Palette size={12} /> Graphic Design Mode</label>
-                    <button onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isGraphicModeActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedType === MediaType.NONE ? 'Select Type' : selectedType}</span></div><ChevronDown size={14} className={isGraphicModeActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                    <button onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isGraphicModeActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                      <div className="flex items-center gap-2 truncate">
+                        <span className={`truncate text-sm font-medium ${selectedType === MediaType.NONE ? 'opacity-50' : ''}`}>{selectedType === MediaType.NONE ? 'Select Type' : selectedType}</span>
+                      </div>
+                      <ChevronDown size={14} className={isGraphicModeActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                    </button>
                     {isTypeDropdownOpen && (
                       <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden max-h-60 overflow-y-auto p-1">
                         {Object.values(MediaType).filter(type => type !== MediaType.NONE).map((type) => (<button key={type} onClick={() => handleTypeSelect(type)} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedType === type && isGraphicModeActive ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}>{getTypeIcon(type)} <span>{type}</span></button>))}
@@ -1765,10 +1871,63 @@ const App: React.FC = () => {
                    </div>
                    <div className="relative" ref={archDropdownRef}>
                     <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isArchModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/60'}`}><Building2 size={12} /> Architecture Render Mode</label>
-                    <button onClick={() => setIsArchDropdownOpen(!isArchDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isArchModeActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedArchStyle === ArchitectureStyle.NONE ? 'Select Style' : selectedArchStyle}</span></div><ChevronDown size={14} className={isArchModeActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                    <button onClick={() => setIsArchDropdownOpen(!isArchDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all duration-300 ${isArchModeActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                      <div className="flex items-center gap-2 truncate">
+                        <span className={`truncate text-sm font-medium ${selectedArchStyle === ArchitectureStyle.NONE ? 'opacity-50' : ''}`}>{selectedArchStyle === ArchitectureStyle.NONE ? 'Select Style' : selectedArchStyle}</span>
+                      </div>
+                      <ChevronDown size={14} className={isArchModeActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                    </button>
                     {isArchDropdownOpen && (
-                      <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden max-h-60 overflow-y-auto p-1">
-                        {Object.values(ArchitectureStyle).filter(style => style !== ArchitectureStyle.NONE).map((style) => (<button key={style} onClick={() => handleArchSelect(style)} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedArchStyle === style ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}><span className={`w-1.5 h-1.5 rounded-full ${selectedArchStyle === style ? 'bg-[#e2b36e]' : 'bg-[#e2b36e]/20'}`} /> <span className="truncate">{style}</span></button>))}
+                      <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
+                        {/* STANDARD - Standalone (Top) */}
+                        <button 
+                            onClick={() => handleArchSelect(ArchitectureStyle.STANDARD)} 
+                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mb-1 ${selectedArchStyle === ArchitectureStyle.STANDARD ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                        >
+                            <span className="font-medium">Standard</span>
+                        </button>
+                        <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
+
+                        {/* GROUPS - Side Flyout */}
+                        {Object.entries(ARCH_STYLE_GROUPS).map(([category, styles]) => {
+                            const isActive = lockedArchCategory === category;
+                            return (
+                            <div key={category} className="group/item relative">
+                                <button 
+                                    onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        setLockedArchCategory(isActive ? null : category); // Click to toggle
+                                    }}
+                                    className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm transition-colors ${isActive ? 'bg-[#e2b36e]/10 text-[#e2b36e]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                >
+                                    <span className="font-medium">{category}</span>
+                                    <ChevronRight size={14} className={`transition-transform duration-200 opacity-70 ${isActive ? 'rotate-90' : ''}`} />
+                                </button>
+                                
+                                {/* FLYOUT SUB-MENU */}
+                                <div className={`absolute left-full top-0 ml-2 w-48 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] max-h-[320px] overflow-y-auto custom-scrollbar animate-in slide-in-from-left-2 fade-in duration-200 ${isActive ? 'block' : 'hidden'}`}>
+                                    {styles.map((style) => (
+                                        <button 
+                                            key={style} 
+                                            onClick={() => handleArchSelect(style)} 
+                                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedArchStyle === style ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full flex-none ${selectedArchStyle === style ? 'bg-[#e2b36e]' : 'bg-[#e2b36e]/20'}`} />
+                                            <span className="font-medium truncate">{style}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )})}
+
+                        <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
+                        {/* OTHERS - Standalone (Bottom) */}
+                        <button 
+                            onClick={() => handleArchSelect(ArchitectureStyle.OTHERS)} 
+                            className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm mt-1 ${selectedArchStyle === ArchitectureStyle.OTHERS ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                        >
+                            <span className="font-medium">Others</span>
+                        </button>
                       </div>
                     )}
                    </div>
@@ -1777,53 +1936,147 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-3 gap-3 mb-6 flex-none">
                   <div className="relative" ref={ratioDropdownRef}>
                      <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isRatioActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Ratio size={10} /> Ratio</label>
-                     <button onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRatioActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate">{isRatioActive && <RatioIcon ratio={selectedAspectRatio} />}<span className="truncate text-sm font-medium">{isRatioActive ? ASPECT_RATIOS.find(r => r.value === selectedAspectRatio)?.label : 'Select'}</span></div><ChevronDown size={14} className={isRatioActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                     <button onClick={() => setIsRatioDropdownOpen(!isRatioDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRatioActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                      <div className="flex items-center gap-2 truncate">
+                        {isRatioActive && <RatioIcon ratio={selectedAspectRatio} />}
+                        <span className={`truncate text-sm font-medium ${!isRatioActive ? 'opacity-50' : ''}`}>{isRatioActive ? ASPECT_RATIOS.find(r => r.value === selectedAspectRatio)?.label : 'Select'}</span>
+                      </div>
+                      <ChevronDown size={14} className={isRatioActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                    </button>
                       {isRatioDropdownOpen && (
                         <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[120px]">{ASPECT_RATIOS.map((ratio) => (<button key={ratio.value} onClick={() => { setSelectedAspectRatio(ratio.value); setIsRatioAuto(false); setIsRatioDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center justify-between gap-2 text-left text-sm ${selectedAspectRatio === ratio.value ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}><div className="flex items-center gap-2"><RatioIcon ratio={ratio.value} /><span>{ratio.label}</span></div></button>))}</div>
                       )}
                   </div>
                   <div className="relative" ref={countDropdownRef}>
                      <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isCountActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Layers size={10} /> Count</label>
-                     <button onClick={() => setIsCountDropdownOpen(!isCountDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isCountActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{isCountActive ? `${imageCount}` : 'Select'}</span></div><ChevronDown size={14} className={isCountActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                     <button onClick={() => setIsCountDropdownOpen(!isCountDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isCountActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                        <div className="flex items-center gap-2 truncate">
+                          <span className={`truncate text-sm font-medium ${!isCountActive ? 'opacity-50' : ''}`}>{isCountActive ? `${imageCount}` : 'Select'}</span>
+                        </div>
+                        <ChevronDown size={14} className={isCountActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                     </button>
                       {isCountDropdownOpen && (
                         <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[100px]">{[1, 2, 4].map((count) => (<button key={count} onClick={() => { setImageCount(count); setIsCountAuto(false); setIsCountDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${imageCount === count ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}><span className="font-bold">{count}</span><span className="opacity-70">Image{count > 1 ? 's' : ''}</span></button>))}</div>
                       )}
                   </div>
                   <div className="relative" ref={qualityDropdownRef}>
                      <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isQualityActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Sparkles size={10} /> Quality</label>
-                     <button onClick={() => setIsQualityDropdownOpen(!isQualityDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isQualityActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{!isQualitySet ? 'Select' : selectedQuality}</span></div><ChevronDown size={14} className={isQualityActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                     <button onClick={() => setIsQualityDropdownOpen(!isQualityDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isQualityActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                        <div className="flex items-center gap-2 truncate">
+                          <span className={`truncate text-sm font-medium ${!isQualitySet ? 'opacity-50' : ''}`}>{!isQualitySet ? 'Select' : selectedQuality}</span>
+                        </div>
+                        <ChevronDown size={14} className={isQualityActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                     </button>
                       {isQualityDropdownOpen && (
                         <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 min-w-[120px]">{Object.values(ImageQuality).map((q) => (<button key={q} onClick={() => { setSelectedQuality(q); setIsQualitySet(true); setIsQualityAuto(false); setIsQualityDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedQuality === q ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}><span className="font-medium">{q}</span></button>))}</div>
                       )}
                   </div>
                 </div>
 
-                {/* --- NEW ENGINE & LIGHTING SETTINGS (VISIBLE ONLY IN ARCH MODE) --- */}
+                {/* --- NESTED DROPDOWNS FOR ENGINE & LIGHTING --- */}
                 {isArchModeActive && (
                   <div className="grid grid-cols-2 gap-3 mb-6 flex-none animate-in fade-in slide-in-from-top-4 duration-300">
+                      
+                      {/* RENDER ENGINE DROPDOWN */}
                       <div className="relative" ref={renderDropdownRef}>
                          <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isRenderEngineActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Cpu size={10} /> Render Engine</label>
-                         <button onClick={() => setIsRenderDropdownOpen(!isRenderDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRenderEngineActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedRenderEngine}</span></div><ChevronDown size={14} className={isRenderEngineActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                         <button onClick={() => setIsRenderDropdownOpen(!isRenderDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isRenderEngineActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                            <div className="flex items-center gap-2 truncate">
+                                <span className={`truncate text-sm font-medium ${selectedRenderEngine === RenderEngine.DEFAULT ? 'opacity-50' : ''}`}>{selectedRenderEngine}</span>
+                            </div>
+                            <ChevronDown size={14} className={isRenderEngineActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                         </button>
                           {isRenderDropdownOpen && (
-                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 max-h-60 overflow-y-auto">
-                                {Object.values(RenderEngine).map((eng) => (
-                                    <button key={eng} onClick={() => { setSelectedRenderEngine(eng); setIsRenderDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedRenderEngine === eng ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}>
-                                        <span className="truncate">{eng}</span>
-                                    </button>
-                                ))}
+                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
+                                {/* Default Option - Text Opaque */}
+                                <button 
+                                    onClick={() => { setSelectedRenderEngine(RenderEngine.DEFAULT); setIsRenderDropdownOpen(false); }} 
+                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedRenderEngine === RenderEngine.DEFAULT ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] font-medium hover:bg-[#e2b36e]/10'}`}
+                                >
+                                    <span>Default</span>
+                                </button>
+                                <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
+                                
+                                {/* Side Flyout Style Categories */}
+                                {Object.entries(ENGINE_CATEGORIES).map(([category, engines]) => {
+                                    const isActive = lockedRenderCategory === category;
+                                    return (
+                                    <div key={category} className="group/item relative">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setLockedRenderCategory(isActive ? null : category); }}
+                                            className={`w-full p-2 rounded flex items-center justify-between text-left text-sm transition-colors ${isActive ? 'bg-[#e2b36e]/10 text-[#e2b36e]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                        >
+                                            <span className="font-medium">{category}</span>
+                                            <ChevronRight size={14} className={`transition-transform duration-200 opacity-70 ${isActive ? 'rotate-90' : ''}`} />
+                                        </button>
+                                        
+                                        {/* Side Flyout Panel */}
+                                        <div className={`absolute left-full top-0 ml-2 w-48 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] max-h-[320px] overflow-y-auto custom-scrollbar animate-in slide-in-from-left-2 fade-in duration-200 ${isActive ? 'block' : 'hidden'}`}>
+                                            {engines.map((eng) => (
+                                                <button 
+                                                    key={eng} 
+                                                    onClick={() => { setSelectedRenderEngine(eng); setIsRenderDropdownOpen(false); }} 
+                                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedRenderEngine === eng ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                                >
+                                                    {/* REMOVED DOT FOR ENGINE */}
+                                                    <span className="truncate">{eng}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )})}
                             </div>
                           )}
                       </div>
+
+                      {/* LIGHTING DROPDOWN */}
                       <div className="relative" ref={lightingDropdownRef}>
                          <label className={`block text-[10px] font-semibold mb-1.5 flex items-center gap-1.5 truncate ${isLightingActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/60'}`}><Sun size={10} /> Lighting</label>
-                         <button onClick={() => setIsLightingDropdownOpen(!isLightingDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isLightingActive ? activeButtonStyle : inactiveButtonStyle}`}><div className="flex items-center gap-2 truncate"><span className="truncate text-sm font-medium">{selectedLighting}</span></div><ChevronDown size={14} className={isLightingActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} /></button>
+                         <button onClick={() => setIsLightingDropdownOpen(!isLightingDropdownOpen)} className={`w-full p-3 rounded-lg flex items-center justify-between border transition-all ${isLightingActive ? activeButtonStyle : inactiveButtonStyle}`}>
+                            <div className="flex items-center gap-2 truncate">
+                                <span className={`truncate text-sm font-medium ${selectedLighting === LightingSetting.DEFAULT ? 'opacity-50' : ''}`}>{selectedLighting}</span>
+                            </div>
+                            <ChevronDown size={14} className={isLightingActive ? 'text-[#e2b36e]' : 'text-[#e2b36e]/30'} />
+                         </button>
                           {isLightingDropdownOpen && (
-                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden p-1 max-h-60 overflow-y-auto">
-                                {Object.values(LightingSetting).map((l) => (
-                                    <button key={l} onClick={() => { setSelectedLighting(l); setIsLightingDropdownOpen(false); }} className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedLighting === l ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e]/60 hover:bg-[#e2b36e]/10'}`}>
-                                        <span className="truncate">{l}</span>
-                                    </button>
-                                ))}
+                            <div className="absolute top-full left-0 w-full mt-1 z-50 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-1 overflow-visible">
+                                {/* Default Option - Text Opaque */}
+                                <button 
+                                    onClick={() => { setSelectedLighting(LightingSetting.DEFAULT); setIsLightingDropdownOpen(false); }} 
+                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedLighting === LightingSetting.DEFAULT ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] font-medium hover:bg-[#e2b36e]/10'}`}
+                                >
+                                    <span>Default</span>
+                                </button>
+                                <div className="h-[1px] bg-[#e2b36e]/10 my-1 mx-2"></div>
+                                
+                                {/* Side Flyout Style Categories */}
+                                {Object.entries(LIGHTING_CATEGORIES).map(([category, lights]) => {
+                                    const isActive = lockedLightingCategory === category;
+                                    return (
+                                    <div key={category} className="mb-1 relative group">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setLockedLightingCategory(isActive ? null : category); }}
+                                            className={`w-full p-2 rounded flex items-center justify-between text-left text-sm transition-colors ${isActive ? 'bg-[#e2b36e]/10 text-[#e2b36e]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                        >
+                                            <span className="font-medium">{category}</span>
+                                            <ChevronRight size={14} className={`transition-transform duration-200 opacity-70 ${isActive ? 'rotate-90' : ''}`} />
+                                        </button>
+                                        
+                                        {/* Side Flyout Panel */}
+                                        <div className={`absolute left-full top-0 ml-2 w-48 bg-[#09232b]/95 backdrop-blur-xl border border-[#e2b36e]/20 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1 z-[60] max-h-[320px] overflow-y-auto custom-scrollbar animate-in slide-in-from-left-2 fade-in duration-200 ${isActive ? 'block' : 'hidden'}`}>
+                                            {lights.map((l) => (
+                                                <button 
+                                                    key={l} 
+                                                    onClick={() => { setSelectedLighting(l); setIsLightingDropdownOpen(false); }} 
+                                                    className={`w-full p-2 rounded flex items-center gap-2 text-left text-sm ${selectedLighting === l ? 'bg-[#e2b36e]/20 text-[#e2b36e] font-bold' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}
+                                                >
+                                                    {/* REMOVED DOT FOR LIGHTING */}
+                                                    <span className="truncate">{l}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )})}
                             </div>
                           )}
                       </div>
@@ -1837,7 +2090,7 @@ const App: React.FC = () => {
                     <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Upload images here to use as Reference</div>
                   </div>
                   <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-[#e2b36e] bg-[#e2b36e]/10' : 'border-[#e2b36e]/20 bg-[#e2b36e]/5'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'input')}>
-                    <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-[#e2b36e] flex items-center gap-1.5"><ImageIcon size={12} /> {isArchModeActive ? 'Input Sketch' : 'Input Image'}</label><span className="text-[10px] text-[#e2b36e]/50">{inputImages.length}/10</span></div>
+                    <div className="flex items-center justify-between mb-1"><label className="text-xs font-medium text-[#e2b36e] flex items-center gap-1.5"><ImageIcon size={12} /> {isArchModeActive ? 'Input Images' : 'Input Image'}</label><span className="text-[10px] text-[#e2b36e]/50">{inputImages.length}/10</span></div>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2"><button onClick={() => inputInputRef.current?.click()} disabled={inputImages.length >= 10} className={`h-14 w-14 flex-none rounded border border-dashed flex items-center justify-center transition-all ${inputImages.length >= 10 ? 'opacity-50 cursor-not-allowed' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`}><Plus size={20} /></button><input type="file" ref={inputInputRef} className="hidden" onChange={handleInputUpload} accept="image/*" multiple />{inputImages.map((img, index) => (<div key={`input-${index}`} className="relative group h-14 w-14 flex-none cursor-move" draggable onDragStart={(e) => handleDragStart(e, 'input', index)}><div className="h-full w-full rounded overflow-hidden border border-[#e2b36e]/30 relative"><img src={img} alt={`Input ${index}`} className="h-full w-full object-cover select-none" draggable={false} /><div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); setPreviewSource('input'); }} className="p-1 hover:text-[#e2b36e] text-white transition-colors drop-shadow-md" title="View Fullscreen"><Maximize size={16} /></button></div></div><button onClick={(e) => { e.stopPropagation(); removeImage('input', index); }} className="absolute -top-2 -right-2 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10 scale-90 hover:scale-100 w-6 h-6 flex items-center justify-center" title="Remove"><X size={14} /></button></div>))}</div>
                     <div className="mt-1 text-[10px] text-[#e2b36e]/40 text-center italic select-none">Upload images here to use as Base</div>
                   </div>
@@ -1908,8 +2161,8 @@ const App: React.FC = () => {
                 </div>
           </GlassCard>
 
-          {/* RIGHT COLUMN: Flex column to stretch vertically */}
-          <div className="w-full lg:flex-1 h-auto flex flex-col gap-6 min-w-0">
+          {/* RIGHT COLUMN: Flex column to stretch vertically. Z-INDEX 10 */}
+          <div className="w-full lg:flex-1 h-auto flex flex-col gap-6 min-w-0 z-10">
               {/* RESULT AREA: FLEX-1 to grow and fill vertical space. Min-height ensures it's never too small. */}
               <GlassCard className="flex-1 w-full flex flex-col relative overflow-hidden min-h-[400px] shrink-0 rounded-2xl">
                   

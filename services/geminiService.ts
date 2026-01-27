@@ -26,6 +26,37 @@ const getDesignContext = (type: MediaType): string => {
   }
 };
 
+// Helper to get rich lighting descriptions
+const getLightingDescription = (setting: LightingSetting): string => {
+  switch (setting) {
+    // Time of Day
+    case LightingSetting.SUNRISE: return "Sunrise lighting, soft warm morning glow, low angle sunlight, long shadows, hopeful atmosphere";
+    case LightingSetting.SUNNY_DAY: return "Sunny Day lighting, bright natural sunlight, clear blue sky, sharp shadows, vibrant colors, high contrast";
+    case LightingSetting.NOON: return "Noon lighting, direct overhead sun, bright and neutral illumination, minimal shadows, energetic and clear";
+    case LightingSetting.GOLDEN_HOUR: return "Golden Hour lighting, rich amber hues, soft diffused sunlight, magical and romantic atmosphere, rim lighting";
+    case LightingSetting.BLUE_HOUR: return "Blue Hour lighting, deep twilight blue tones, city lights beginning to glow, cool and serene atmosphere, cinematic contrast";
+    case LightingSetting.NIGHT: return "Night lighting, dark atmospheric, artificial light sources, high contrast between shadow and light, mysterious";
+    
+    // Weather
+    case LightingSetting.OVERCAST: return "Overcast lighting, soft diffused light, no harsh shadows, even illumination, neutral white balance, calm mood";
+    case LightingSetting.RAINY: return "Rainy weather lighting, wet surfaces with reflections, gloomy grey sky, dramatic droplets, moody and atmospheric";
+    case LightingSetting.SNOWY: return "Snowy environment lighting, bright white reflective light, cool color temperature, crisp and clean atmosphere";
+    case LightingSetting.FOGGY: return "Foggy/Misty lighting, volumetric light rays, low visibility depth, ethereal and mysterious atmosphere, soft edges";
+    
+    // Artificial
+    case LightingSetting.WARM_INTERIOR: return "Warm Interior lighting, cozy 3000K artificial light, inviting atmosphere, soft lamp glow, comfortable ambience";
+    case LightingSetting.STUDIO: return "Studio lighting, professional photography setup, 3-point lighting, perfectly controlled shadows, high detail visibility";
+    case LightingSetting.NEON: return "Neon/Cyberpunk lighting, vibrant pink/blue/purple LED lights, high contrast, futuristic and edgy, glowing surfaces";
+    
+    // Mood
+    case LightingSetting.CINEMATIC: return "Cinematic lighting, dramatic light falloff, emphasis on storytelling, color grading, teal and orange contrast, movie-like quality";
+    case LightingSetting.MOODY: return "Moody lighting, low key, deep shadows, emotional, dramatic chiaroscuro, artistic tension";
+    case LightingSetting.BIOLUMINESCENT: return "Bioluminescent lighting, organic glowing elements in darkness, surreal and magical colors, avatar-like atmosphere";
+    
+    default: return "Professional photorealistic lighting";
+  }
+};
+
 // Helper to extract clean base64 and mimeType
 const parseBase64Image = (dataUrl: string) => {
   if (dataUrl.includes(';base64,')) {
@@ -180,7 +211,8 @@ export const generateCreativeAsset = async (
 
     let lightingPrompt = "";
     if (lighting !== LightingSetting.DEFAULT) {
-        lightingPrompt = `Lighting Condition: ${lighting}. Strictly apply this lighting atmosphere to the scene.`;
+        // USE RICH DESCRIPTION FROM HELPER
+        lightingPrompt = `Lighting Condition: ${getLightingDescription(lighting)}. Strictly apply this lighting atmosphere to the scene.`;
     }
 
     enhancedPrompt = `
@@ -506,7 +538,9 @@ export const generatePromptFromImage = async (
     if (renderEngine !== RenderEngine.DEFAULT) engineText = `Simulate the rendering style of ${renderEngine}.`;
     
     let lightingText = "";
-    if (lighting !== LightingSetting.DEFAULT) lightingText = `The lighting should be ${lighting}.`;
+    if (lighting !== LightingSetting.DEFAULT) {
+        lightingText = `The lighting should be ${getLightingDescription(lighting)}.`;
+    }
 
     promptRequest = `
       You are an expert Architectural Consultant. 
@@ -554,7 +588,7 @@ export const enhanceUserPrompt = async (
   if (archStyle !== ArchitectureStyle.NONE) {
     const context = archStyle === ArchitectureStyle.OTHERS ? "architectural render" : `${archStyle} style render`;
     const engineText = renderEngine !== RenderEngine.DEFAULT ? `, rendered in ${renderEngine}` : '';
-    const lightingText = lighting !== LightingSetting.DEFAULT ? `, with ${lighting} lighting` : '';
+    const lightingText = lighting !== LightingSetting.DEFAULT ? `, with ${getLightingDescription(lighting)}` : '';
 
     instruction = `
       You are a specialized Architectural Visualization Prompt Engineer.
