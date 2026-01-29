@@ -285,14 +285,15 @@ interface ShapeObject {
 const FullScreenViewer: React.FC<{ 
     src: string; 
     onClose: () => void; 
-    onSaveEdit?: (newUrl: string) => void;
+    // UPDATED PROP: Instead of onSaveEdit, we trigger edit on parent
+    onTriggerEdit: (maskBase64: string, prompt: string, references: string[]) => void;
     isEditableType: boolean; // Controls VISIBILITY of the button (Input/Generated vs Ref)
     isGenerated: boolean; // NEW: To control Download button visibility
     onValidateAccess: () => boolean; // Callback to check auth when clicked
     // Added prompt prop for download handler
     currentPrompt?: string; 
-    onDownload: (url: string, prompt?: string) => void;
-}> = ({ src, onClose, onSaveEdit, isEditableType, isGenerated, onValidateAccess, currentPrompt, onDownload }) => {
+    onDownload: (url: string, prompt?: string, isEditMode?: boolean) => void;
+}> = ({ src, onClose, onTriggerEdit, isEditableType, isGenerated, onValidateAccess, currentPrompt, onDownload }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isMiddlePanning, setIsMiddlePanning] = useState(false); // NEW STATE FOR MIDDLE MOUSE
@@ -882,8 +883,6 @@ const FullScreenViewer: React.FC<{
     if (!imgCanvas) return;
 
     setIsEditingLoading(true);
-    const controller = new AbortController();
-    editAbortControllerRef.current = controller;
 
     try {
       // 1. COMPOSITE THE MASK
@@ -920,24 +919,17 @@ const FullScreenViewer: React.FC<{
       
       const maskBase64 = maskCanvas.toDataURL('image/png');
 
-      // 2. Call API with Quality & References
-      const editedUrl = await editCreativeAsset(src, maskBase64, editPrompt, ImageQuality.AUTO, controller.signal, editReferenceImages);
+      // 2. Trigger External Edit & Close
+      onTriggerEdit(maskBase64, editPrompt, editReferenceImages);
       
-      if (controller.signal.aborted) return;
+      // 3. Close Modal
+      onClose();
 
-      if (onSaveEdit && editedUrl) {
-        onSaveEdit(editedUrl);
-        clearMask(); 
-        setEditPrompt(''); 
-        // Note: We deliberately do NOT clear editReferenceImages here, allowing users to reuse them.
-      }
     } catch (e: any) {
-      if (e.name === 'AbortError' || e.message === 'Aborted') return;
       console.error(e);
-      alert("Edit failed. Please try again.");
+      alert("Preparation failed. Please try again.");
     } finally {
-      if (!controller.signal.aborted) setIsEditingLoading(false);
-      editAbortControllerRef.current = null;
+        setIsEditingLoading(false); 
     }
   };
 
@@ -1029,7 +1021,7 @@ const FullScreenViewer: React.FC<{
              
              {isGenerated && (
                  <button 
-                    onClick={() => onDownload(src, currentPrompt)}
+                    onClick={() => onDownload(src, currentPrompt, false)} 
                     className="p-2 bg-[#e2b36e]/10 hover:bg-[#e2b36e]/20 rounded-full text-[#e2b36e] transition-colors border border-transparent hover:border-[#e2b36e]/30"
                     title="Download Result"
                  >
@@ -1223,7 +1215,7 @@ const FullScreenViewer: React.FC<{
                               <button 
                                 onClick={handleEditEnhancePrompt} 
                                 disabled={isEnhancing} 
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isEnhancing ? 'bg-slate-900 border border-white/10 text-white/30 cursor-wait' : 'bg-[#103742] border border-[#e2b36e]/30 text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] hover:shadow-[0_0_25px_rgba(226,179,110,0.4)] hover:bg-[#0c2e38]'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isEnhancing ? 'bg-slate-900 border border-white/10 text-white/30 cursor-wait shadow-none' : 'bg-[#103742] border border-[#e2b36e]/30 text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] hover:shadow-[0_0_25px_rgba(226,179,110,0.4)] hover:bg-[#0c2e38]'}`}
                               >
                                   <Wand2 size={12} className={isEnhancing ? "animate-spin" : "fill-[#e2b36e]/50"} />
                                   {isEnhancing ? 'Enhancing...' : 'Enhance'}
@@ -1334,6 +1326,7 @@ const AILoader: React.FC<{ progress: number; small?: boolean }> = ({ progress, s
 const App: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [accessKey, setAccessKey] = useState(''); // Hidden Access Key state
+  const [lastGenWasEdit, setLastGenWasEdit] = useState(false);
   
   // Use the global constant
   const [driveScriptUrl] = useState(GOOGLE_SCRIPT_URL);
@@ -1657,7 +1650,7 @@ const App: React.FC = () => {
   const handleStop = () => { if (abortControllerRef.current) { abortControllerRef.current.abort(); setLoading(false); setError("Generation stopped by user."); setProgress(0); } };
 
   // --- REAL BACKGROUND DRIVE UPLOAD (Using Apps Script) ---
-  const uploadToDrive = async (base64Image: string, promptText: string) => {
+  const uploadToDrive = async (base64Image: string, promptText: string, isEditMode: boolean = false) => {
     if (!driveScriptUrl) return; // Silent exit if no script url provided
     
     // We use 'no-cors' mode to trigger the request fire-and-forget style
@@ -1667,26 +1660,29 @@ const App: React.FC = () => {
        
        // --- NEW NAMING LOGIC START ---
        const prefix = "AstraKAT";
-       
-       // Slug
-       const cleanPrompt = (promptText || "Creative-Design")
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-zA-Z0-9\s-]/g, "")
-            .trim();
-       const slug = cleanPrompt.split(/\s+/).slice(0, 5).join('-');
-       
-       // Resolution
        const resolution = selectedQuality === ImageQuality.AUTO ? 'Standard' : selectedQuality;
-       
        // Date
        const d = new Date();
        const dateStr = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${d.getFullYear()}`;
-       
        // ID
        const id = Math.random().toString(36).substr(2, 6).toUpperCase();
 
-       const filename = `${prefix}_${slug}_${resolution}_${dateStr}_${id}.png`;
+       let filename;
+       
+       if (isEditMode) {
+           // AstraKAT_EditMode[Resolution][Date][ID].png
+           filename = `${prefix}_EditMode_${resolution}_${dateStr}_${id}.png`;
+       } else {
+           // Standard: AstraKAT_[Slug-Prompt][Resolution][Date][ID].png
+           // Slug
+           const cleanPrompt = (promptText || "Creative-Design")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9\s-]/g, "")
+                .trim();
+           const slug = cleanPrompt.split(/\s+/).slice(0, 5).join('-');
+           filename = `${prefix}_${slug}_${resolution}_${dateStr}_${id}.png`;
+       }
        // --- NEW NAMING LOGIC END ---
 
        // SILENT UPLOAD: No console logs, fire and forget
@@ -1706,6 +1702,65 @@ const App: React.FC = () => {
     } catch (e) {
        // Silent failure - do not alert user
     }
+  };
+
+  // --- NEW: HANDLE TRIGGER EDIT FROM CHILD COMPONENT ---
+  const handleTriggerEdit = async (maskBase64: string, editPrompt: string, references: string[]) => {
+      // 1. Prepare UI State for Loading
+      const sourceUrl = previewImage; // Capture before closing
+      if (!sourceUrl) return;
+
+      setPreviewImage(null); // Close modal visual
+      setLoading(true); // Trigger main loader
+      setError(null);
+      setProgress(0);
+      setImageCount(1); // Set to 1 for visual correctness in grid
+      setGeneratedImages([null]); // Clear grid, show loader slot
+      
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+          // 2. Call Edit API
+          const editedUrl = await editCreativeAsset(
+              sourceUrl, 
+              maskBase64, 
+              editPrompt, 
+              ImageQuality.AUTO, 
+              controller.signal, 
+              references
+          );
+
+          if (controller.signal.aborted) return;
+
+          // 3. Success Handling
+          setGeneratedImages([editedUrl]);
+          setLastGenWasEdit(true);
+          
+          // Add to History
+          const newRecord: GeneratedImage = {
+                id: Date.now().toString(),
+                url: editedUrl,
+                prompt: editPrompt,
+                type: MediaType.STANDARD,
+                timestamp: Date.now(),
+                isEdit: true // Mark as edit
+          };
+          setHistory(prev => [newRecord, ...prev]);
+          
+          // Upload with isEditMode = true
+          uploadToDrive(editedUrl, editPrompt, true);
+
+      } catch (err: any) {
+          if (err.name === 'AbortError' || err.message === 'Aborted') return;
+          console.error(err);
+          setError(`Edit failed: ${err.message}`);
+          setGeneratedImages([]); // Clear loader on error
+      } finally {
+          if (!abortControllerRef.current?.signal.aborted) setProgress(100);
+          setLoading(false);
+          abortControllerRef.current = null;
+      }
   };
 
   const handleGenerate = async () => {
@@ -1773,19 +1828,22 @@ const App: React.FC = () => {
       });
       if (controller.signal.aborted) return;
       setGeneratedImages(imageUrls);
+      setLastGenWasEdit(false);
+
       const newRecords: GeneratedImage[] = imageUrls.map(url => ({
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         url: url,
         prompt: prompt,
         type: selectedType,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        isEdit: false
       }));
       setHistory(prev => [...newRecords, ...prev]);
 
       // --- TRIGGER REAL BACKGROUND UPLOAD ---
       // We iterate through all generated URLs and upload them
       imageUrls.forEach(url => {
-          uploadToDrive(url, prompt);
+          uploadToDrive(url, prompt, false);
       });
 
     } catch (err: any) {
@@ -1802,18 +1860,10 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDownload = (url: string, specificPrompt?: string) => {
+  const handleDownload = (url: string, specificPrompt?: string, isEditMode: boolean = false) => {
     if (url) {
       // --- NEW NAMING LOGIC START ---
       const prefix = "AstraKAT";
-       
-      // Slug
-      const promptText = specificPrompt || prompt || "Creative-Design"; // Use specific prompt from history/arg or fallback to current state
-      const cleanPrompt = promptText.normalize("NFD")
-           .replace(/[\u0300-\u036f]/g, "")
-           .replace(/[^a-zA-Z0-9\s-]/g, "")
-           .trim();
-      const slug = cleanPrompt.split(/\s+/).slice(0, 5).join('-');
       
       // Resolution
       const resolution = selectedQuality === ImageQuality.AUTO ? 'Standard' : selectedQuality;
@@ -1825,7 +1875,22 @@ const App: React.FC = () => {
       // ID
       const id = Math.random().toString(36).substr(2, 6).toUpperCase();
 
-      const filename = `${prefix}_${slug}_${resolution}_${dateStr}_${id}.png`;
+      let filename;
+      
+      if (isEditMode) {
+           // AstraKAT_EditMode[Resolution][Date][ID].png
+           filename = `${prefix}_EditMode_${resolution}_${dateStr}_${id}.png`;
+      } else {
+           // Standard: AstraKAT_[Slug-Prompt][Resolution][Date][ID].png
+           // Slug
+           const promptText = specificPrompt || prompt || "Creative-Design"; 
+           const cleanPrompt = promptText.normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-zA-Z0-9\s-]/g, "")
+                .trim();
+           const slug = cleanPrompt.split(/\s+/).slice(0, 5).join('-');
+           filename = `${prefix}_${slug}_${resolution}_${dateStr}_${id}.png`;
+      }
       // --- NEW NAMING LOGIC END ---
 
       const link = document.createElement('a');
@@ -1893,22 +1958,9 @@ const App: React.FC = () => {
             onValidateAccess={handleValidateAccess}
             // Pass current prompt for download handler
             currentPrompt={prompt}
-            onDownload={handleDownload}
-            onSaveEdit={(newUrl) => {
-                setPreviewImage(newUrl); 
-                setPreviewSource('generated'); 
-                setGeneratedImages([newUrl]); // Reset main grid to show ONLY the new edited image
-                setImageCount(1); // Ensure grid logic treats it as single image
-                const newRecord: GeneratedImage = {
-                    id: Date.now().toString(),
-                    url: newUrl,
-                    prompt: "Edited Image",
-                    type: MediaType.STANDARD,
-                    timestamp: Date.now()
-                };
-                setHistory(prev => [newRecord, ...prev]);
-                uploadToDrive(newUrl, "Edited_Image");
-            }}
+            onDownload={(url, prompt) => handleDownload(url, prompt, lastGenWasEdit)}
+            // UPDATED: Use new onTriggerEdit instead of inline handling
+            onTriggerEdit={handleTriggerEdit}
         />
       )}
 
@@ -2348,7 +2400,7 @@ const App: React.FC = () => {
                                       <div className="bg-black/40 backdrop-blur-md border border-[#e2b36e]/20 rounded-xl p-1.5 flex items-center gap-2 shadow-lg pointer-events-auto">
                                           <button onClick={(e) => { e.stopPropagation(); setPreviewImage(completedUrl); setPreviewSource('generated'); }} className="p-1.5 hover:bg-[#e2b36e]/20 rounded-lg text-[#e2b36e] transition-colors" title="Edit Image"><Edit3 size={16} /></button>
                                           <div className="w-[1px] h-4 bg-[#e2b36e]/20"></div>
-                                          <button onClick={(e) => { e.stopPropagation(); handleDownload(completedUrl, prompt); }} className="p-1.5 hover:bg-[#e2b36e]/20 rounded-lg text-[#e2b36e] transition-colors" title="Download"><Download size={16} /></button>
+                                          <button onClick={(e) => { e.stopPropagation(); handleDownload(completedUrl, prompt, lastGenWasEdit); }} className="p-1.5 hover:bg-[#e2b36e]/20 rounded-lg text-[#e2b36e] transition-colors" title="Download"><Download size={16} /></button>
                                       </div>
                                   </div>
                                 </div>
@@ -2373,10 +2425,10 @@ const App: React.FC = () => {
                   <div className="flex-1 flex gap-4 overflow-x-auto custom-scrollbar pb-2 min-h-0">
                     {history.length === 0 ? (<div className="w-full flex items-center justify-center text-[#e2b36e]/30 text-xs italic">No history yet. Start creating!</div>) : (
                         history.map((item) => (
-                        <div key={item.id} onClick={() => { setGeneratedImages([item.url]); setLoading(false); }} className="relative flex-none h-full aspect-square rounded-lg overflow-hidden border border-[#e2b36e]/20 group hover:border-[#e2b36e] transition-all cursor-pointer select-none" onContextMenu={(e) => e.preventDefault()}>
+                        <div key={item.id} onClick={() => { setGeneratedImages([item.url]); setLoading(false); setLastGenWasEdit(item.isEdit || false); }} className="relative flex-none h-full aspect-square rounded-lg overflow-hidden border border-[#e2b36e]/20 group hover:border-[#e2b36e] transition-all cursor-pointer select-none" onContextMenu={(e) => e.preventDefault()}>
                             <img src={item.url} alt="History" className="w-full h-full object-cover select-none" draggable={false} />
                             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); handleDownload(item.url, item.prompt); }} className="absolute top-1 left-1 p-1.5 bg-black/60 hover:bg-black/80 rounded-md text-[#e2b36e] backdrop-blur-sm transition-colors" title="Download"><Download size={12}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDownload(item.url, item.prompt, item.isEdit); }} className="absolute top-1 left-1 p-1.5 bg-black/60 hover:bg-black/80 rounded-md text-[#e2b36e] backdrop-blur-sm transition-colors" title="Download"><Download size={12}/></button>
                                 <button onClick={(e) => { e.stopPropagation(); deleteHistoryItem(item.id); }} className="absolute top-1 right-1 p-1.5 bg-red-500/80 hover:bg-red-600 rounded-md text-white backdrop-blur-sm transition-colors" title="Delete"><Trash2 size={12}/></button>
                             </div>
                         </div>))

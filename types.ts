@@ -107,6 +107,7 @@ export interface GeneratedImage {
   prompt: string;
   type: MediaType;
   timestamp: number;
+  isEdit?: boolean;
 }
 
 export const ASPECT_RATIOS = [
