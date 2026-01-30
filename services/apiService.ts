@@ -19,6 +19,17 @@ if (!STORAGE_SCRIPT_URL) {
   console.warn("Warning: VITE_STORAGE_SCRIPT_URL is missing. Generated images won't be saved to Drive.");
 }
 
+// Helper to handle error messages centrally
+const handleApiError = (data: any) => {
+    if (data.error) {
+        // Change specific error text as requested
+        if (data.error === "Unauthorized: Invalid App Secret") {
+            throw new Error("Unauthorized: Invalid (500)");
+        }
+        throw new Error(data.error);
+    }
+};
+
 export const apiService = {
   /**
    * Đăng nhập: Gửi username/pass lên Script chính
@@ -39,10 +50,7 @@ export const apiService = {
       });
       
       const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      handleApiError(data);
 
       return {
         username: data.username,
@@ -75,7 +83,7 @@ export const apiService = {
       });
 
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      handleApiError(data);
       
       return { success: true, newBalance: data.credits };
     } catch (error) {
@@ -103,7 +111,7 @@ export const apiService = {
       });
 
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      handleApiError(data);
       return data.url;
    },
 
