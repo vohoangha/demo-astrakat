@@ -227,7 +227,8 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
       const padding = 2 * uiScale;
 
       ctx.save();
-      ctx.strokeStyle = '#3b82f6';
+      // Changed to Gold color for theme consistency
+      ctx.strokeStyle = '#e2b36e';
       ctx.lineWidth = 2 * uiScale;
       ctx.setLineDash([6 * uiScale, 4 * uiScale]);
       ctx.strokeRect(x - padding, y - padding, width + padding*2, height + padding*2);
@@ -235,24 +236,25 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
       const centerX = x + width / 2;
       const centerY = y + height / 2;
       ctx.setLineDash([]);
-      ctx.fillStyle = '#3b82f6';
+      ctx.fillStyle = '#e2b36e';
       ctx.beginPath();
       ctx.arc(centerX, centerY, centerSize, 0, 2 * Math.PI);
       ctx.fill();
-      ctx.strokeStyle = 'white';
+      ctx.strokeStyle = '#09232b';
       ctx.lineWidth = 2 * uiScale;
       ctx.stroke();
 
       const handleX = x + width;
       const handleY = y + height;
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#3b82f6';
+      ctx.fillStyle = '#e2b36e';
+      ctx.strokeStyle = '#09232b';
       ctx.lineWidth = 2 * uiScale;
       ctx.beginPath();
       ctx.arc(handleX, handleY, handleSize / 2, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
-      ctx.strokeStyle = '#3b82f6';
+      
+      ctx.strokeStyle = '#09232b';
       ctx.lineWidth = 4 * uiScale; 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -603,17 +605,17 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[100] bg-[#0f172a]/95 flex flex-col animate-in fade-in duration-300"
+      className="fixed inset-0 z-[100] bg-[#103742]/95 flex flex-col animate-in fade-in duration-300"
       onWheel={handleWheel}
       onClick={(e) => { if (e.target === e.currentTarget && !isEditMode) onClose(); }} 
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="flex-none h-16 w-full px-6 flex justify-between items-center z-50 bg-gradient-to-b from-[#0f172a] to-transparent pointer-events-none">
-        <div className="text-white/80 text-sm flex gap-4 pointer-events-auto items-center">
+      <div className="flex-none h-16 w-full px-6 flex justify-between items-center z-50 bg-gradient-to-b from-[#103742] to-transparent pointer-events-none">
+        <div className="text-[#e2b36e]/80 text-sm flex gap-4 pointer-events-auto items-center">
             {isEditMode ? (
-                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full border border-white/20 backdrop-blur-md">
+                <div className="flex items-center gap-2 bg-[#e2b36e]/10 px-3 py-1.5 rounded-full border border-[#e2b36e]/20 backdrop-blur-md">
                      <span className="animate-pulse w-2 h-2 rounded-full bg-red-500"></span>
-                     <span className="font-bold text-white tracking-wider text-xs uppercase">Edit Mode Active</span>
+                     <span className="font-bold text-[#e2b36e] tracking-wider text-xs uppercase">Edit Mode Active</span>
                 </div>
             ) : (
                 <>
@@ -636,7 +638,7 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
                             }
                         }
                     }}
-                    className={`p-2 rounded-full transition-all duration-300 border ${isEditMode ? 'bg-white text-[#0f172a] border-white shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                    className={`p-2 rounded-full transition-all duration-300 border ${isEditMode ? 'bg-[#e2b36e] text-[#09232b] border-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.5)]' : 'bg-[#09232b]/50 text-[#e2b36e] border-[#e2b36e]/20 hover:bg-[#e2b36e]/20'}`}
                     title={isEditMode ? "Exit Edit Mode" : "Edit Image"}
                  >
                     {isEditMode ? <Check className="w-6 h-6" /> : <Edit3 className="w-6 h-6" />}
@@ -646,7 +648,7 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
              {isGenerated && (
                  <button 
                     onClick={() => onDownload(src, currentPrompt)}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors border border-transparent hover:border-white/30"
+                    className="p-2 bg-[#09232b]/50 hover:bg-[#e2b36e]/20 rounded-full text-[#e2b36e] transition-colors border border-[#e2b36e]/20 hover:border-[#e2b36e]/40"
                     title="Download Result"
                  >
                     <Download className="w-6 h-6" />
@@ -655,7 +657,7 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
 
              <button 
                 onClick={onClose}
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors border border-transparent hover:border-white/30"
+                className="p-2 bg-[#09232b]/50 hover:bg-[#e2b36e]/20 rounded-full text-[#e2b36e] transition-colors border border-[#e2b36e]/20 hover:border-[#e2b36e]/40"
             >
                 <X className="w-6 h-6" />
             </button>
@@ -664,27 +666,27 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
 
       {isEditMode && (
           <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-50 pointer-events-auto animate-in slide-in-from-left fade-in duration-300">
-             <GlassCard className="p-3 flex flex-col gap-3">
-                 <button onClick={() => { setEditTool('move'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'move' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Move/Select"><Hand size={20} /></button>
-                 <div className="h-[1px] w-full bg-white/20 my-1"></div>
-                 <button onClick={() => { setEditTool('brush'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'brush' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Brush"><Brush size={20} /></button>
+             <GlassCard className="p-3 flex flex-col gap-3 border-[#e2b36e]/20 bg-[#09232b]/80">
+                 <button onClick={() => { setEditTool('move'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'move' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Move/Select"><Hand size={20} /></button>
+                 <div className="h-[1px] w-full bg-[#e2b36e]/20 my-1"></div>
+                 <button onClick={() => { setEditTool('brush'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'brush' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Brush"><Brush size={20} /></button>
                  {editTool === 'brush' && (
-                     <div className="absolute left-full top-16 ml-3 bg-[#1e293b]/90 backdrop-blur-md border border-white/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
-                        <div className="flex items-center justify-between mb-1"><span className="text-[10px] text-white uppercase font-bold">Brush Size</span><span className="text-[10px] text-white font-mono">{brushSize}px</span></div>
-                        <input type="range" min="5" max="500" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white" />
+                     <div className="absolute left-full top-16 ml-3 bg-[#09232b]/95 backdrop-blur-md border border-[#e2b36e]/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
+                        <div className="flex items-center justify-between mb-1"><span className="text-[10px] text-[#e2b36e] uppercase font-bold">Brush Size</span><span className="text-[10px] text-[#e2b36e] font-mono">{brushSize}px</span></div>
+                        <input type="range" min="5" max="500" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="w-full h-1.5 bg-[#e2b36e]/20 rounded-lg appearance-none cursor-pointer accent-[#e2b36e]" />
                      </div>
                  )}
-                 <button onClick={() => { setEditTool('eraser'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'eraser' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Eraser Brush"><Eraser size={20} /></button>
+                 <button onClick={() => { setEditTool('eraser'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all relative group ${editTool === 'eraser' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Eraser Brush"><Eraser size={20} /></button>
                  {editTool === 'eraser' && (
-                     <div className="absolute left-full top-28 ml-3 bg-[#1e293b]/90 backdrop-blur-md border border-white/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
-                        <div className="flex items-center justify-between mb-1"><span className="text-[10px] text-white uppercase font-bold">Eraser Size</span><span className="text-[10px] text-white font-mono">{eraserSize}px</span></div>
-                        <input type="range" min="5" max="500" value={eraserSize} onChange={(e) => setEraserSize(parseInt(e.target.value))} className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white" />
+                     <div className="absolute left-full top-28 ml-3 bg-[#09232b]/95 backdrop-blur-md border border-[#e2b36e]/20 rounded-lg p-3 w-32 shadow-xl animate-in slide-in-from-left-2 fade-in z-50">
+                        <div className="flex items-center justify-between mb-1"><span className="text-[10px] text-[#e2b36e] uppercase font-bold">Eraser Size</span><span className="text-[10px] text-[#e2b36e] font-mono">{eraserSize}px</span></div>
+                        <input type="range" min="5" max="500" value={eraserSize} onChange={(e) => setEraserSize(parseInt(e.target.value))} className="w-full h-1.5 bg-[#e2b36e]/20 rounded-lg appearance-none cursor-pointer accent-[#e2b36e]" />
                      </div>
                  )}
-                 <div className="h-[1px] w-full bg-white/20 my-1"></div>
-                 <button onClick={() => { setEditTool('rect'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'rect' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Rectangle"><SquareIcon size={20} /></button>
-                 <button onClick={() => { setEditTool('circle'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'circle' ? 'bg-white text-[#0f172a]' : 'text-white hover:bg-white/10'}`} title="Circle"><CircleIcon size={20} /></button>
-                 <div className="h-[1px] w-full bg-white/20 my-1"></div>
+                 <div className="h-[1px] w-full bg-[#e2b36e]/20 my-1"></div>
+                 <button onClick={() => { setEditTool('rect'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'rect' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Rectangle"><SquareIcon size={20} /></button>
+                 <button onClick={() => { setEditTool('circle'); setSelectedShapeId(null); }} className={`p-2 rounded-lg transition-all ${editTool === 'circle' ? 'bg-[#e2b36e] text-[#09232b]' : 'text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Circle"><CircleIcon size={20} /></button>
+                 <div className="h-[1px] w-full bg-[#e2b36e]/20 my-1"></div>
                  <button onClick={clearMask} className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors" title="Clear Mask"><Trash2 size={20} /></button>
              </GlassCard>
           </div>
@@ -706,44 +708,44 @@ export const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
         <canvas ref={visualCanvasRef} className={`absolute pointer-events-none will-change-transform ${!isEditMode && 'hidden'}`} style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`, width: imgRef.current?.getBoundingClientRect().width || 'auto', height: imgRef.current?.getBoundingClientRect().height || 'auto', transition: (interactionState !== 'NONE' || isMiddlePanning) ? 'none' : 'transform 0.2s ease-out' }} />
       </div>
 
-      <div className="flex-none w-full flex justify-center pb-6 pt-2 bg-gradient-to-t from-[#0f172a] via-[#0f172a] to-transparent z-50 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="flex-none w-full flex justify-center pb-6 pt-2 bg-gradient-to-t from-[#103742] via-[#103742] to-transparent z-50 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
          {!isEditMode ? (
-            <div className="flex items-center gap-4 bg-[#1e293b]/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                <button onClick={() => handleZoom(-0.5)} className="p-2 hover:bg-white/10 rounded-lg text-white disabled:opacity-30" disabled={scale <= 1}><ZoomOut className="w-5 h-5" /></button>
-                <span className="text-white font-mono min-w-[3ch] text-center font-bold">{Math.round(scale * 100)}%</span>
-                <button onClick={() => handleZoom(0.5)} className="p-2 hover:bg-white/10 rounded-lg text-white disabled:opacity-30" disabled={scale >= 5}><ZoomIn className="w-5 h-5" /></button>
+            <div className="flex items-center gap-4 bg-[#09232b]/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-[#e2b36e]/20 shadow-[0_0_20px_rgba(226,179,110,0.1)]">
+                <button onClick={() => handleZoom(-0.5)} className="p-2 hover:bg-[#e2b36e]/10 rounded-lg text-[#e2b36e] disabled:opacity-30" disabled={scale <= 1}><ZoomOut className="w-5 h-5" /></button>
+                <span className="text-[#e2b36e] font-mono min-w-[3ch] text-center font-bold">{Math.round(scale * 100)}%</span>
+                <button onClick={() => handleZoom(0.5)} className="p-2 hover:bg-[#e2b36e]/10 rounded-lg text-[#e2b36e] disabled:opacity-30" disabled={scale >= 5}><ZoomIn className="w-5 h-5" /></button>
             </div>
          ) : (
-             <GlassCard className="p-0 flex flex-col gap-0 w-[800px] max-w-[95vw] animate-in slide-in-from-bottom fade-in duration-300 relative overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+             <GlassCard className="p-0 flex flex-col gap-0 w-[800px] max-w-[95vw] animate-in slide-in-from-bottom fade-in duration-300 relative overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)] border-[#e2b36e]/20">
                   <div className="w-full px-1 pt-1 pb-1">
-                      <div className="border border-dashed border-white/20 bg-white/5 rounded-xl p-2.5 flex flex-col gap-2">
+                      <div className="border border-dashed border-[#e2b36e]/30 bg-[#09232b]/40 rounded-xl p-2.5 flex flex-col gap-2">
                           <div className="flex justify-between items-center px-1">
-                              <label className="text-[10px] font-bold text-white/60 flex items-center gap-1.5 uppercase tracking-wider"><CopyPlus size={10} /> References</label>
-                              <span className="text-[10px] text-white/40 font-mono">{editReferenceImages.length}/5</span>
+                              <label className="text-[10px] font-bold text-[#e2b36e]/60 flex items-center gap-1.5 uppercase tracking-wider"><CopyPlus size={10} /> References</label>
+                              <span className="text-[10px] text-[#e2b36e]/40 font-mono">{editReferenceImages.length}/5</span>
                           </div>
                           <div className="flex gap-2 overflow-x-auto custom-scrollbar p-2">
-                              <button onClick={() => editRefInputRef.current?.click()} disabled={editReferenceImages.length >= 5} className={`h-12 w-12 flex-none rounded-lg border border-dashed flex items-center justify-center transition-all ${editReferenceImages.length >= 5 ? 'opacity-50 cursor-not-allowed border-white/20 text-white/20' : 'border-white/30 text-white hover:bg-white/10'}`} title="Add Reference Image or Paste (Ctrl+V)"><Plus size={18} /></button>
+                              <button onClick={() => editRefInputRef.current?.click()} disabled={editReferenceImages.length >= 5} className={`h-12 w-12 flex-none rounded-lg border border-dashed flex items-center justify-center transition-all ${editReferenceImages.length >= 5 ? 'opacity-50 cursor-not-allowed border-[#e2b36e]/20 text-[#e2b36e]/20' : 'border-[#e2b36e]/30 text-[#e2b36e] hover:bg-[#e2b36e]/10'}`} title="Add Reference Image or Paste (Ctrl+V)"><Plus size={18} /></button>
                               <input type="file" ref={editRefInputRef} className="hidden" onChange={handleEditRefUpload} accept="image/*" multiple />
-                              {editReferenceImages.length === 0 && (<div className="flex items-center text-[10px] text-white/30 italic select-none px-2">Upload or Paste (Ctrl+V) images here to guide the AI</div>)}
-                              {editReferenceImages.map((img, idx) => (<div key={idx} className="relative h-12 w-12 flex-none group"><img src={img} alt={`Ref ${idx}`} className="h-full w-full object-cover rounded-lg border border-white/20" /><button onClick={() => removeEditRefImage(idx)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm scale-75 hover:scale-100 z-10"><X size={10} /></button></div>))}
+                              {editReferenceImages.length === 0 && (<div className="flex items-center text-[10px] text-[#e2b36e]/30 italic select-none px-2">Upload or Paste (Ctrl+V) images here to guide the AI</div>)}
+                              {editReferenceImages.map((img, idx) => (<div key={idx} className="relative h-12 w-12 flex-none group"><img src={img} alt={`Ref ${idx}`} className="h-full w-full object-cover rounded-lg border border-[#e2b36e]/20" /><button onClick={() => removeEditRefImage(idx)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm scale-75 hover:scale-100 z-10"><X size={10} /></button></div>))}
                           </div>
                       </div>
                   </div>
                   <div className="relative w-full h-32">
-                      <div className="relative flex-1 bg-white/5 hover:bg-white/10 focus-within:bg-white/10 transition-colors h-full">
-                        <textarea value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="Describe what to change in the highlighted area..." className="w-full h-full bg-transparent border-none px-4 py-3 text-sm text-white placeholder-white/40 focus:outline-none resize-none custom-scrollbar pb-12" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditGenerate(); }}} />
+                      <div className="relative flex-1 bg-[#09232b]/40 hover:bg-[#09232b]/60 focus-within:bg-[#09232b]/60 transition-colors h-full">
+                        <textarea value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="Describe what to change in the highlighted area..." className="w-full h-full bg-transparent border-none px-4 py-3 text-sm text-[#e2b36e] placeholder-[#e2b36e]/40 focus:outline-none resize-none custom-scrollbar pb-12" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditGenerate(); }}} />
                       </div>
                       <div className="absolute left-3 bottom-3 flex gap-2 z-10">
                           {!editPrompt.trim() ? (
-                              <button onClick={handleEditAutoPrompt} disabled={editAutoLoading} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg border border-white/30 ${editAutoLoading ? 'bg-[#1e293b] text-white cursor-wait' : 'bg-white/20 text-white hover:bg-white/30'}`}><Sparkles size={12} className={editAutoLoading ? "animate-spin" : ""} />{editAutoLoading ? 'Reading...' : 'Auto Prompt'}</button>
+                              <button onClick={handleEditAutoPrompt} disabled={editAutoLoading} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg border border-[#e2b36e]/30 ${editAutoLoading ? 'bg-[#09232b] text-[#e2b36e] cursor-wait' : 'bg-[#e2b36e]/10 text-[#e2b36e] hover:bg-[#e2b36e]/20'}`}><Sparkles size={12} className={editAutoLoading ? "animate-spin" : ""} />{editAutoLoading ? 'Reading...' : 'Auto Prompt'}</button>
                           ) : (
-                              <button onClick={handleEditEnhancePrompt} disabled={isEnhancing} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isEnhancing ? 'bg-slate-900 border border-white/10 text-white/30 cursor-wait' : 'bg-[#1e293b] border border-white/30 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] hover:bg-[#334155]'}`}><Wand2 size={12} className={isEnhancing ? "animate-spin" : "fill-white/50"} />{isEnhancing ? 'Enhancing...' : 'Enhance'}</button>
+                              <button onClick={handleEditEnhancePrompt} disabled={isEnhancing} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isEnhancing ? 'bg-[#09232b] border border-[#e2b36e]/10 text-[#e2b36e]/30 cursor-wait' : 'bg-[#09232b] border border-[#e2b36e]/30 text-[#e2b36e] shadow-[0_0_15px_rgba(226,179,110,0.2)] hover:shadow-[0_0_25px_rgba(226,179,110,0.4)] hover:bg-[#103742]'}`}><Wand2 size={12} className={isEnhancing ? "animate-spin" : "fill-[#e2b36e]/50"} />{isEnhancing ? 'Enhancing...' : 'Enhance'}</button>
                           )}
                       </div>
                       <div className="absolute right-3 bottom-3 z-10 flex items-center gap-2">
                            <Button onClick={isEditingLoading ? handleStopEdit : handleEditGenerate} isLoading={isEditingLoading} variant={isEditingLoading ? "rainbow-stop" : "rainbow"} className="py-2 px-6 text-xs font-bold flex items-center gap-2 min-w-[120px] hover:scale-105 active:scale-95 transition-transform duration-200">
                                 {isEditingLoading ? (<><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className="mr-2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>STOP</>) : (<>
-                                    <svg width="16" height="16" viewBox="0 0 100 100" className="fill-current text-white mr-1"><path d="M 50 0 C 50 35 60 45 100 50 C 60 55 50 65 50 100 C 50 65 40 55 0 50 C 40 45 50 35 50 0 Z" /></svg>
+                                    <svg width="16" height="16" viewBox="0 0 100 100" className="fill-current text-[#09232b] mr-1"><path d="M 50 0 C 50 35 60 45 100 50 C 60 55 50 65 50 100 C 50 65 40 55 0 50 C 40 45 50 35 50 0 Z" /></svg>
                                     Generate
                                     {/* Format cost to remove trailing zeros */}
                                     <span className="font-normal opacity-80 ml-1 text-[10px] lowercase">(-{editCost} credits)</span>
