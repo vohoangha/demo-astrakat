@@ -952,7 +952,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut, onPasswor
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-semibold text-[#e2b36e]">Prompt</label>
                     {(inputImages.length > 0 || referenceImages.length > 0) && (
-                        <button onClick={handleAutoPrompt} disabled={isAutoPrompting} className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg ${isAutoPrompting ? 'bg-[#e2b36e] text-[#09232b] cursor-wait' : 'bg-[#103742]/60 text-[#e2b36e] border border-[#e2b36e]/30 hover:bg-[#e2b36e]/20'}`}><Sparkles size={10} className={isAutoPrompting ? "animate-spin" : ""} />{isAutoPrompting ? 'Reading...' : 'Auto Prompt'}</button>
+                        <button onClick={handleAutoPrompt} disabled={isAutoPrompting} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shadow-lg border border-[#e2b36e]/30 ${isAutoPrompting ? 'bg-[#09232b] text-[#e2b36e] cursor-wait' : 'bg-[#e2b36e]/10 text-[#e2b36e] hover:bg-[#e2b36e]/20'}`}><Sparkles size={12} className={isAutoPrompting ? "animate-spin" : ""} />{isAutoPrompting ? 'Reading...' : 'Auto Prompt'}</button>
                     )}
                   </div>
                   <div className="relative flex-1 bg-[#09232b]/40 border border-[#e2b36e]/20 rounded-lg hover:bg-[#09232b]/60 focus-within:bg-[#09232b]/60 focus-within:ring-1 focus-within:ring-[#e2b36e]/50 transition-all group overflow-hidden">
