@@ -1,6 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { MediaType, ArchitectureStyle, ImageQuality, RenderEngine, LightingSetting } from "../types";
+import { apiService } from "./apiService";
 
 const getDesignContext = (type: MediaType): string => {
   switch (type) {
@@ -85,6 +86,43 @@ const getApiKey = (): string => {
   return "";
 };
 
+// HELPER: Execute Generation with automatic Proxy Fallback
+async function safeGenerateContent(ai: GoogleGenAI, params: any) {
+    try {
+        return await ai.models.generateContent(params);
+    } catch (error: any) {
+        const msg = error.message || error.toString();
+        // Check for specific Referrer Error
+        if (msg.includes("generativelanguage.googleapis.com") && msg.includes("referrer")) {
+            console.warn("⚠️ Direct Gemini API blocked by browser/extension. Switching to Server Proxy...");
+            // Use Proxy
+            const proxyRes = await apiService.geminiProxy(params);
+            
+            // Map raw JSON to a structure that looks enough like GenerateContentResponse
+            // The SDK response has getters, but for our usage we mostly access properties
+            // We need to ensure we return something that works with the existing code
+            // Existing code usually accesses: response.candidates[0].content.parts
+            // OR response.text getter.
+            
+            // Add a mock .text getter if needed, but our code accesses parts directly mostly
+            if (!proxyRes.candidates) throw new Error("Proxy response invalid: " + JSON.stringify(proxyRes));
+            
+            // Mock the .text property if used by helper functions
+            if (!proxyRes.text) {
+                Object.defineProperty(proxyRes, 'text', {
+                    get: function() {
+                        try {
+                            return this.candidates?.[0]?.content?.parts?.[0]?.text;
+                        } catch { return undefined; }
+                    }
+                });
+            }
+            return proxyRes;
+        }
+        throw error;
+    }
+}
+
 const handleGeminiError = (error: any) => {
     const msg = error.message || error.toString();
     
@@ -116,7 +154,7 @@ const handleGeminiError = (error: any) => {
     }
     
     // Fallback generic error for users
-    throw new Error("Generation failed. Please try again.");
+    throw new Error(`Generation failed: ${msg.substring(0, 50)}...`);
 };
 
 // NEW FUNCTION: Lightweight ping to check API health
@@ -139,7 +177,7 @@ export async function testGeminiConnection(): Promise<{ latency: number, status:
 
         // Use smallest model for fastest ping
         const model = 'gemini-3-flash-preview';
-        await ai.models.generateContent({ 
+        await safeGenerateContent(ai, { 
             model, 
             contents: { parts: [{ text: "ping" }] }
         });
@@ -223,7 +261,7 @@ export async function generateCreativeAsset(
   for (let i = 0; i < count; i++) {
       if (signal?.aborted) break;
       try {
-          const response = await ai.models.generateContent({ model, contents: { parts }, config });
+          const response = await safeGenerateContent(ai, { model, contents: { parts }, config });
           let foundImage = false;
           if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
               for (const part of response.candidates[0].content.parts) {
@@ -280,7 +318,7 @@ export async function generatePromptFromImage(
     parts.push({ text: promptText });
 
     try {
-        const response = await ai.models.generateContent({ model, contents: { parts } });
+        const response = await safeGenerateContent(ai, { model, contents: { parts } });
         let text = response.text || "";
         text = text.replace(/^Here is a .*? prompt:?\s*/i, "");
         text = text.replace(/^Based on .*?:\s*/i, "");
@@ -315,7 +353,7 @@ export async function enhanceUserPrompt(
     context += `\nGoal: Make it descriptive, artistic, and detailed. Focus on lighting, composition, texture, and mood. Keep it under 200 words. Return ONLY the enhanced prompt text.`;
 
     try {
-        const response = await ai.models.generateContent({ model, contents: context });
+        const response = await safeGenerateContent(ai, { model, contents: context });
         return response.text || originalPrompt;
     } catch (e) {
         handleGeminiError(e);
@@ -373,7 +411,7 @@ export async function editCreativeAsset(
     };
 
     try {
-        const response = await ai.models.generateContent({ model, contents: { parts }, config });
+        const response = await safeGenerateContent(ai, { model, contents: { parts }, config });
 
         if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
             for (const part of response.candidates[0].content.parts) {
