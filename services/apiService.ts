@@ -79,6 +79,18 @@ const proxyFetch = async (body: any) => {
 
 export const apiService = {
 
+  // NEW: Proxy method for Gemini API
+  geminiProxy: async (payload: { model: string, contents: any, config?: any }) => {
+      try {
+          return await proxyFetch({
+              action: 'gemini_proxy',
+              ...payload
+          });
+      } catch (e: any) {
+          throw new Error(`Proxy Gemini Failed: ${e.message}`);
+      }
+  },
+
   getUserProfile: async (username: string): Promise<User | null> => {
       if (IS_DEV_MODE) {
           const user = MOCK_DB_USERS.find(u => u.username === username.toLowerCase());
