@@ -5,7 +5,7 @@ import { MediaType, ArchitectureStyle, ImageQuality, RenderEngine, LightingSetti
 const getDesignContext = (type: MediaType): string => {
   switch (type) {
     case MediaType.STANDARD: return "General Creative Design. Follow the user's prompt and reference images strictly. Focus on high-quality visual execution.";
-    case MediaType.POSTER: return "Professional Poster Design. Focus on bold typography, clear visual hierarchy, modern layout, and eye-catching composition suitable for print or digital marketing.";
+    case MediaType.POSTER: return "Modern Professional Poster Design. Focus on bold typography, clear visual hierarchy, modern layout, and eye-catching composition suitable for print or digital marketing.";
     case MediaType.KEY_VISUAL: return "Key Visual. Central marketing imagery, high production value, suitable for branding and campaigns.";
     case MediaType.SOCIAL_POST: return "Social Media Post. Square or portrait format, engaging, optimized for mobile viewing, viral potential.";
     case MediaType.WALLPAPER: return "Wallpaper. High resolution, aesthetic, balanced composition suitable for backgrounds.";
@@ -79,24 +79,44 @@ const resizeBase64Image = (base64Str: string, maxDimension: number): Promise<str
 };
 
 const getApiKey = (): string => {
+  if (typeof process !== 'undefined' && process.env.API_KEY) return process.env.API_KEY;
   const viteKey = (import.meta as any).env?.VITE_API_KEY;
   if (viteKey && typeof viteKey === 'string') return viteKey;
-  if (typeof process !== 'undefined' && process.env.API_KEY) return process.env.API_KEY;
   return "";
 };
 
 const handleGeminiError = (error: any) => {
     const msg = error.message || error.toString();
-    if (msg.includes("API_KEY_HTTP_REFERRER_BLOCKED")) {
-        throw new Error(`🚫 Access Denied: Your API Key restricts access from this domain.\n\n👉 Please go to Google AI Studio > Get API key > Edit key > Add this website URL to 'Website restrictions'.`);
+    
+    // LOGGING FOR ADMIN CONSOLE (Technical Details)
+    console.error(`[Gemini API Error]: ${msg}`);
+
+    // SPECIFIC CHECK: The "PC 2" Issue
+    // If the error explicitly states that the referrer is the Google API itself, it means the browser
+    // or an extension is stripping the original referrer and replacing it.
+    if (msg.includes("Requests from referer https://generativelanguage.googleapis.com/ are blocked")) {
+        throw new Error("⚠️ Browser Privacy Issue: Your browser is blocking the referrer. Please disable privacy extensions (like 'Referer Control') or use Chrome.");
     }
+
+    // USER FACING MESSAGES (Simple)
+    if (msg.includes("API_KEY_HTTP_REFERRER_BLOCKED") || (msg.includes("403") && msg.includes("referer"))) {
+        throw new Error("⚠️ Security Check Failed: Please check API Key restrictions in Google Cloud Console. Ensure your domain (e.g. localhost) is allowed.");
+    }
+    
     if (msg.includes("429") || msg.includes("quota")) {
-        throw new Error("⚠️ API Quota Exceeded. You are generating too fast or have hit the daily limit. Please wait a moment.");
+        throw new Error("⚠️ Too many requests. Please wait a moment.");
     }
+    
     if (msg.includes("503") || msg.includes("overloaded")) {
-         throw new Error("🐢 The AI model is currently overloaded. Please try again in a few seconds.");
+         throw new Error("🐢 AI Server is busy. Retrying usually helps.");
     }
-    throw error;
+    
+    if (msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("networkerror")) {
+         throw new Error("📡 Connection failed. Check your internet.");
+    }
+    
+    // Fallback generic error for users
+    throw new Error("Generation failed. Please try again.");
 };
 
 // NEW FUNCTION: Lightweight ping to check API health
@@ -127,7 +147,11 @@ export async function testGeminiConnection(): Promise<{ latency: number, status:
         const latency = Date.now() - start;
         return { latency, status: 'ok' };
     } catch (e: any) {
-        return { latency: 0, status: 'error', message: e.message };
+        let helpfulMsg = e.message;
+        if (e.message.includes("403")) helpfulMsg = "403 Forbidden: API Key Restricted.";
+        // Catch the specific PC2 error in diagnostics too
+        if (e.message.includes("generativelanguage.googleapis.com")) helpfulMsg = "Referrer Blocked by Browser Extension";
+        return { latency: 0, status: 'error', message: helpfulMsg };
     }
 }
 
@@ -216,7 +240,6 @@ export async function generateCreativeAsset(
           }
           if (!foundImage) console.warn("No image in response", response);
       } catch (e) {
-          console.error(`Generation failed for image ${i+1}`, e);
           handleGeminiError(e);
       }
   }
