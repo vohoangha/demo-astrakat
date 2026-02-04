@@ -24,10 +24,30 @@ export default async function handler(req, res) {
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         
+        // Fix for "referer <empty> blocked":
+        // We must explicitly send a Referer header that matches the API Key's allowed domain list.
+        // We prioritize the Origin header from the client request.
+        let refererToUse = req.headers.origin;
+        
+        // Fallback to Referer header if Origin is missing
+        if (!refererToUse) refererToUse = req.headers.referer;
+        
+        // Fallback to Host header construction if both are missing (e.g., server-to-server or stripped)
+        if (!refererToUse && req.headers.host) {
+             const proto = req.headers['x-forwarded-proto'] || 'http'; 
+             refererToUse = `${proto}://${req.headers.host}`;
+        }
+        
+        // Ultimate fallback for local dev if nothing else works
+        if (!refererToUse) refererToUse = "http://localhost:3000";
+
         try {
             const gRes = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Referer': refererToUse 
+                },
                 body: JSON.stringify(bodyPayload)
             });
             
