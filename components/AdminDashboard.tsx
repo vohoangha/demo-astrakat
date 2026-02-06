@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from './Button';
 import { 
@@ -6,7 +7,8 @@ import {
     Trash2, ArrowRight, ShieldCheck,
     Shield, UserCog, User, Search, RefreshCw, Lock, Ban, Key, ArrowUpDown, ChevronDown,
     List, RotateCcw, Calendar, Filter, Plus, FileText, Wallet, Coins, AlertOctagon, Fingerprint,
-    Eye, EyeOff, Database, Terminal, Server, Activity, AlertCircle, Wifi, Cloud, StopCircle, UploadCloud
+    Eye, EyeOff, Database, Terminal, Server, Activity, AlertCircle, Wifi, Cloud, StopCircle, UploadCloud,
+    Globe, MousePointer2
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { testGeminiConnection } from '../services/geminiService';
@@ -71,6 +73,7 @@ interface AdminDashboardProps {
 type TabType = 'injection' | 'members' | 'transactions' | 'register' | 'console';
 type SortOption = 'id_asc' | 'id_desc' | 'alpha_asc' | 'credits_desc' | 'credits_asc';
 type TopUpType = 'Top-up' | 'Reward' | 'Others';
+type WebAccessType = 'EK' | 'KAT' | 'ALL';
 
 interface Transaction {
     date: string;
@@ -121,12 +124,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [txDateRange, setTxDateRange] = useState<'ALL' | '7' | '14' | '31'>('ALL');
 
   const [isBulkRegister, setIsBulkRegister] = useState(false);
-  const [newUser, setNewUser] = useState<{ username: string; password: string; credits: number | string; role: string; team: string }>({ 
-      username: '', password: '', credits: '', role: '', team: '' 
+  // NEW: Added web_access to state
+  const [newUser, setNewUser] = useState<{ username: string; password: string; credits: number | string; role: string; team: string; web_access: WebAccessType }>({ 
+      username: '', password: '', credits: '', role: '', team: '', web_access: 'ALL'
   });
   const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false);
-  const [bulkUsers, setBulkUsers] = useState<{ username: string; password: string; credits: number | string; role: string; team: string }[]>([
-      { username: '', password: '', credits: '', role: '', team: '' }
+  // NEW: Added web_access to bulk state
+  const [bulkUsers, setBulkUsers] = useState<{ username: string; password: string; credits: number | string; role: string; team: string; web_access: WebAccessType }[]>([
+      { username: '', password: '', credits: '', role: '', team: '', web_access: 'ALL' }
   ]);
 
   const [processingUser, setProcessingUser] = useState<string | null>(null);
@@ -158,6 +163,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [securityMessage, setSecurityMessage] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
   const [securityAction, setSecurityAction] = useState<((password: string) => Promise<void>) | null>(null);
+
+  // --- WEB ACCESS MODAL STATE ---
+  const [webAccessModalUser, setWebAccessModalUser] = useState<{username: string, current: string} | null>(null);
+  const [tempWebAccess, setTempWebAccess] = useState<WebAccessType>('ALL');
 
   useEffect(() => {
     fetchUsers();
@@ -352,7 +361,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   credits: user.credits,
                   role: user.role,
                   team: user.team,
-                  status: user.status
+                  status: user.status,
+                  web_access: user.web_access // Sync Access
               });
               successCount++;
           } catch (e: any) {
@@ -448,27 +458,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       }
   };
 
-  // Sets the revocation amount to the Max credits of selected users to ensure 0 balance
   const handleSetMaxRevoke = () => {
       if (selectedUsers.length === 0) {
           showNotification("Select users first", "info");
           return;
       }
-      
       const targetUsers = users.filter(u => selectedUsers.includes(u.username));
       if (targetUsers.length === 0) return;
-
       const maxCredits = Math.max(...targetUsers.map(u => u.credits));
-      // Add a small buffer or just use max. Since backend logic does Math.max(0, current - amount), 
-      // setting amount = current balance clears it. 
-      // If we have multiple users, setting amount = max(all users) guarantees everyone goes to 0 
-      // (assuming backend handles negative result by clamping to 0, which it does).
       setAmount(maxCredits > 0 ? maxCredits : 0);
   };
 
   const handleTransaction = () => {
     if (selectedUsers.length === 0) return;
-    if (amount <= 0 && transType === 'add') { // Allow 0 for revoke if just clearing empty accounts, but generally revoke needs > 0
+    if (amount <= 0 && transType === 'add') { 
         showNotification("Amount must be greater than 0", "warning");
         return;
     }
@@ -569,7 +572,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
              const result = await (apiService as any).adminCreateUserBulk(validUsers, password);
              if (result.success) {
                 showNotification(`Registered ${result.createdCount} users!`, "success");
-                setBulkUsers([{ username: '', password: '', credits: '', role: '', team: '' }]); 
+                // Reset bulk form
+                setBulkUsers([{ username: '', password: '', credits: '', role: '', team: '', web_access: 'ALL' }]); 
                 fetchUsers();
             } else { 
                 throw new Error(result.error);
@@ -592,13 +596,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             password: newUser.password.trim() || "Astra123@",
             credits: newUser.credits === '' ? 0 : Number(newUser.credits), 
             role: newUser.role || 'user',
-            team: newUser.team || 'EK'
+            team: newUser.team || 'EK',
+            web_access: newUser.web_access || 'ALL'
         };
 
         executeSecureAction(`Initialize User: ${finalUsername}?`, async (password) => {
             await apiService.adminCreateUser(payload, password);
             showNotification(`User [${payload.username}] initialized!`, "success");
-            setNewUser({ username: '', password: '', credits: '', role: '', team: '' }); 
+            setNewUser({ username: '', password: '', credits: '', role: '', team: '', web_access: 'ALL' }); 
             fetchUsers();
         });
     }
@@ -607,7 +612,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const updateBulkUser = (index: number, field: string, value: any) => {
       setBulkUsers(prev => { const newArr = [...prev]; newArr[index] = { ...newArr[index], [field]: value }; return newArr; });
   };
-  const addBulkRow = () => { if (bulkUsers.length >= 10) return; setBulkUsers(prev => [...prev, { username: '', password: '', credits: '', role: '', team: '' }]); };
+  const addBulkRow = () => { if (bulkUsers.length >= 10) return; setBulkUsers(prev => [...prev, { username: '', password: '', credits: '', role: '', team: '', web_access: 'ALL' }]); };
   const removeBulkRow = (index: number) => { setBulkUsers(prev => prev.filter((_, i) => i !== index)); };
 
   const handleRoleChange = (username: string, currentRole: string) => {
@@ -630,6 +635,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             await (apiService as any).adminToggleStatus(username, newStatus, password);
             setUsers(prev => prev.map(u => u.username === username ? { ...u, status: newStatus } : u));
             showNotification(`Status updated for ${username}`, "success");
+          } finally { setProcessingUser(null); }
+      });
+  };
+
+  // NEW: Open Web Access Modal
+  const openWebAccessModal = (username: string, current: string) => {
+      setWebAccessModalUser({ username, current });
+      setTempWebAccess((current as WebAccessType) || 'ALL');
+  };
+
+  const confirmWebAccessChange = () => {
+      if (!webAccessModalUser) return;
+      const { username } = webAccessModalUser;
+      const newAccess = tempWebAccess;
+      
+      setWebAccessModalUser(null); // Close modal first
+
+      executeSecureAction(`Change access for [${username}] to ${newAccess}?`, async (password) => {
+          setProcessingUser(username);
+          try {
+             await (apiService as any).adminUpdateWebAccess(username, newAccess, password);
+             setUsers(prev => prev.map(u => u.username === username ? { ...u, web_access: newAccess } : u));
+             showNotification(`Web Access updated to ${newAccess}`, "success");
           } finally { setProcessingUser(null); }
       });
   };
@@ -726,6 +754,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   return (
     <>
+    {/* WEB ACCESS SELECTION MODAL */}
+    {webAccessModalUser && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+             <div className="w-full max-w-md bg-[#09232b] border border-[#e2b36e]/20 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col relative">
+                 
+                 {/* Header */}
+                 <div className="p-6 pb-2 flex justify-between items-start">
+                     <div>
+                         <h2 className="text-xl font-black text-[#e2b36e] uppercase tracking-tight">Select Web Access</h2>
+                         <p className="text-xs text-[#e2b36e]/50 font-medium mt-1">
+                            Determine which portal <span className="text-[#e2b36e] font-bold">{webAccessModalUser.username}</span> can access.
+                         </p>
+                     </div>
+                     <button onClick={() => setWebAccessModalUser(null)} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-[#e2b36e]/50 hover:text-[#e2b36e] transition-colors">
+                         <X size={18} />
+                     </button>
+                 </div>
+
+                 {/* Options */}
+                 <div className="p-6 pt-4 space-y-3">
+                     {/* EK Option */}
+                     <button 
+                        onClick={() => setTempWebAccess('EK')}
+                        className={`w-full p-4 rounded-2xl border flex items-center gap-4 transition-all duration-200 group relative overflow-hidden ${tempWebAccess === 'EK' ? 'bg-[#103742] border-[#1e40af] shadow-[0_0_20px_rgba(30,64,175,0.3)]' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05]'}`}
+                     >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border text-lg transition-colors ${tempWebAccess === 'EK' ? 'bg-[#1e40af] border-[#1e40af] text-white' : 'bg-[#09232b] border-white/10 text-[#e2b36e]/40 group-hover:text-[#1e40af]'}`}>
+                            <Globe size={20} />
+                        </div>
+                        <div className="text-left flex-1">
+                            {/* Text always gold */}
+                            <div className="font-bold text-sm text-[#e2b36e]">EK Portal</div>
+                            <div className="text-[10px] text-[#e2b36e]/40 font-mono mt-0.5">https://ekastra.vercel.app/</div>
+                        </div>
+                        {tempWebAccess === 'EK' && <div className="text-[#1e40af]"><CheckCircle2 size={20} /></div>}
+                     </button>
+
+                     {/* KAT Option */}
+                     <button 
+                        onClick={() => setTempWebAccess('KAT')}
+                        className={`w-full p-4 rounded-2xl border flex items-center gap-4 transition-all duration-200 group relative overflow-hidden ${tempWebAccess === 'KAT' ? 'bg-[#103742] border-[#e2b36e] shadow-[0_0_20px_rgba(226,179,110,0.3)]' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05]'}`}
+                     >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border text-lg transition-colors ${tempWebAccess === 'KAT' ? 'bg-[#e2b36e] border-[#e2b36e] text-[#09232b]' : 'bg-[#09232b] border-white/10 text-[#e2b36e]/40 group-hover:text-[#e2b36e]'}`}>
+                            <Globe size={20} />
+                        </div>
+                        <div className="text-left flex-1">
+                            {/* Text always gold */}
+                            <div className="font-bold text-sm text-[#e2b36e]">KAT Portal</div>
+                            <div className="text-[10px] text-[#e2b36e]/40 font-mono mt-0.5">https://astra-kat.vercel.app/</div>
+                        </div>
+                        {tempWebAccess === 'KAT' && <div className="text-[#e2b36e]"><CheckCircle2 size={20} /></div>}
+                     </button>
+
+                     {/* ALL Option */}
+                     <button 
+                        onClick={() => setTempWebAccess('ALL')}
+                        className={`w-full p-4 rounded-2xl border flex items-center gap-4 transition-all duration-200 group relative overflow-hidden ${tempWebAccess === 'ALL' ? 'bg-gradient-to-r from-[#215a6c]/40 to-[#215a6c]/20 border-[#215a6c] shadow-[0_0_20px_rgba(33,90,108,0.3)]' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05]'}`}
+                     >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border text-lg transition-colors ${tempWebAccess === 'ALL' ? 'bg-[#215a6c] border-[#215a6c] text-white' : 'bg-[#09232b] border-white/10 text-[#e2b36e]/40 group-hover:text-[#215a6c]'}`}>
+                            <ShieldCheck size={20} />
+                        </div>
+                        <div className="text-left flex-1">
+                            {/* Text always gold */}
+                            <div className="font-bold text-sm text-[#e2b36e]">All Access</div>
+                            <div className="text-[10px] text-[#e2b36e]/40 font-mono mt-0.5 uppercase tracking-wider">Full Privileges</div>
+                        </div>
+                        {tempWebAccess === 'ALL' && <div className="text-[#215a6c]"><CheckCircle2 size={20} /></div>}
+                     </button>
+                 </div>
+
+                 {/* Footer - Confirm Action */}
+                 <div className="p-6 pt-0">
+                     <Button onClick={confirmWebAccessChange} className="w-full py-4 text-sm font-bold tracking-widest shadow-xl">
+                        CONFIRM CHANGE
+                     </Button>
+                 </div>
+             </div>
+        </div>
+    )}
+
     {isSecurityModalOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
              <GlassCard className="w-full max-w-sm p-0 relative border border-[#e2b36e]/30 shadow-[0_0_50px_rgba(226,179,110,0.15)] overflow-hidden">
@@ -781,12 +888,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         </div>
     )}
 
+    {/* ... [Main Container code same as before] ... */}
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-hidden font-sans">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-md animate-in fade-in duration-500" onClick={onClose}></div>
       
       <div className="relative w-full max-w-7xl h-[90vh] flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-500 shadow-2xl rounded-3xl overflow-hidden border border-[#e2b36e]/20 ring-1 ring-[#e2b36e]/10 bg-[#103742]/60 backdrop-blur-2xl">
          
+         {/* ... [Header code same as before] ... */}
          <div className="flex-none h-20 border-b border-[#e2b36e]/10 flex items-center justify-between px-8 relative z-20 bg-gradient-to-r from-white/5 to-transparent">
+            {/* ... */}
             <div className="flex items-center gap-4">
                 <div className="relative">
                     <div className="absolute inset-0 bg-[#e2b36e] blur-lg opacity-20 animate-pulse"></div>
@@ -815,7 +925,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     </button>
                 )}
 
-                {/* ONLINE USER COUNTER IN HEADER - MOVED HERE */}
+                {/* ONLINE USER COUNTER IN HEADER */}
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#e2b36e]/10 border border-[#e2b36e]/20 rounded-full shadow-[0_0_10px_rgba(226,179,110,0.1)] mr-2">
                     <span className="relative flex h-2 w-2">
                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e2b36e] opacity-75"></span>
@@ -843,6 +953,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             </div>
          </div>
 
+         {/* ... [Tabs and Content Area] ... */}
          <div className="flex-none h-14 border-b border-[#e2b36e]/10 flex items-center px-8 gap-8 bg-[#09232b]/40 overflow-x-auto">
             <button onClick={() => setActiveTab('injection')} className={`h-full border-b-2 flex items-center gap-2 px-2 transition-all text-sm font-bold tracking-wide uppercase whitespace-nowrap ${activeTab === 'injection' ? 'border-[#e2b36e] text-[#e2b36e]' : 'border-transparent text-[#e2b36e]/40 hover:text-[#e2b36e]'}`}><Zap size={16} className={activeTab === 'injection' ? 'fill-[#e2b36e]/20' : ''}/> Top-Up</button>
             <button onClick={() => setActiveTab('members')} className={`h-full border-b-2 flex items-center gap-2 px-2 transition-all text-sm font-bold tracking-wide uppercase whitespace-nowrap ${activeTab === 'members' ? 'border-[#e2b36e] text-[#e2b36e]' : 'border-transparent text-[#e2b36e]/40 hover:text-[#e2b36e]'}`}><UsersIcon size={16} className={activeTab === 'members' ? 'fill-[#e2b36e]/20' : ''}/> Members</button>
@@ -862,7 +973,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     </div>
 
                     <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                        {/* Injection Tab Content... */}
+                        {/* ... [Search header] ... */}
                         <div className="h-10 bg-white/5 border-b border-[#e2b36e]/10 grid grid-cols-12 gap-4 px-6 items-center text-[10px] text-[#e2b36e]/40 font-bold uppercase tracking-widest select-none shrink-0 relative z-20">
                              <div className="col-span-1 flex justify-center"><button onClick={handleSelectAll} className="hover:text-[#e2b36e] transition-colors">{isAllSelected ? <CheckSquare size={16} className="text-[#e2b36e]" /> : <Square size={16} />}</button></div>
                              <div className="col-span-1">ID</div>
@@ -890,7 +1001,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                 </div>
                             )})}
                         </div>
-
+                        
+                        {/* ... [Amount/Action Bar same as before] ... */}
                         <div className="flex-none p-6 border-t border-[#e2b36e]/10 bg-[#09232b]/95 backdrop-blur-xl z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] min-h-[8rem] h-auto">
                              <div className="flex flex-wrap items-center gap-4 justify-center max-w-6xl mx-auto relative">
                                  <div className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-xl px-5 py-3 shadow-inner h-14 shrink-0">
@@ -948,8 +1060,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             {activeTab === 'members' && (
                 <div className="absolute inset-0 p-8 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="max-w-6xl mx-auto space-y-6">
-                        {/* Search Bar Container */}
-                        <div className="bg-[#09232b]/70 backdrop-blur-md border border-[#e2b36e]/20 rounded-2xl p-4 flex items-center gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)] sticky top-0 z-40">
+                        <div className="bg-[#09232b]/70 backdrop-blur-xl border border-[#e2b36e]/20 rounded-2xl p-4 flex items-center gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)] sticky top-0 z-40 transition-all">
                              <Search className="text-[#e2b36e]/40" />
                              <input type="text" placeholder="Search members by username..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-transparent w-full text-[#e2b36e] placeholder-[#e2b36e]/30 focus:outline-none" />
                              <div className="relative shrink-0"><button onClick={() => setIsFilterTeamDropdownOpen(!isFilterTeamDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs hover:bg-white/5 transition-colors text-[#e2b36e]/70"><Filter size={12} /> Team: <span className="text-[#e2b36e] font-bold">{filterTeam === 'ALL' ? 'All' : filterTeam}</span> <ChevronDown size={12} /></button>{isFilterTeamDropdownOpen && (<div className="absolute top-full right-0 mt-2 w-48 bg-[#09232b] border border-[#e2b36e]/20 rounded-lg shadow-xl overflow-hidden z-[100]"><button onClick={() => { setFilterTeam('ALL'); setIsFilterTeamDropdownOpen(false); }} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-white/10 text-[#e2b36e]">ALL TEAMS</button>{TEAMS.map(team => (<button key={team} onClick={() => { setFilterTeam(team); setIsFilterTeamDropdownOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 text-[#e2b36e]/70">{team}</button>))}</div>)}</div>
@@ -975,7 +1086,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                         <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${u.status === 'banned' ? 'bg-red-500/20 text-red-400' : 'bg-[#e2b36e]/20 text-[#e2b36e]'}`}>{u.status === 'active' ? 'ACTIVE' : u.status}</div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 text-sm mt-2 bg-black/20 p-3 rounded-lg border border-white/5"><div className="flex flex-col"><span className="text-[10px] text-[#e2b36e]/40 uppercase">Role</span><span className="font-bold text-[#e2b36e]">{u.role}</span></div><div className="flex flex-col items-end"><span className="text-[10px] text-[#e2b36e]/40 uppercase">Balance</span><span className="font-bold text-[#e2b36e]">{u.credits}</span></div></div>
-                                    <div className="grid grid-cols-4 gap-2 mt-auto pt-2 border-t border-white/5"><button onClick={() => handleRoleChange(u.username, u.role)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-[#e2b36e] transition-colors" title={u.role === 'admin' ? "Demote" : "Promote"} disabled={processingUser === u.username}>{u.role === 'admin' ? <User size={16} /> : <Shield size={16} />}</button><button onClick={() => handleResetPassword(u.username)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-yellow-400 transition-colors" title="Reset Password" disabled={processingUser === u.username}><Key size={16} /></button><button onClick={() => handleToggleBan(u.username, u.status)} className={`p-2 rounded hover:bg-white/10 transition-colors ${u.status === 'banned' ? 'text-[#e2b36e]' : 'text-[#e2b36e]/40 hover:text-orange-400'}`} title={u.status === 'banned' ? "Unban" : "Ban"} disabled={processingUser === u.username}>{u.status === 'banned' ? <CheckCircle2 size={16} /> : <Ban size={16} />}</button><button onClick={() => handleDeleteUser(u.username)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-red-500 transition-colors" title="Delete User" disabled={processingUser === u.username}><Trash2 size={16} /></button></div>
+                                    
+                                    {/* WEB ACCESS BADGE */}
+                                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/5 bg-white/5">
+                                        <Globe size={12} className={u.web_access === 'EK' ? 'text-[#1e40af]' : u.web_access === 'KAT' ? 'text-[#e2b36e]' : 'text-[#215a6c]'} />
+                                        <span className="text-[10px] font-bold text-[#e2b36e]/60 uppercase tracking-wide flex-1">PORTAL:</span>
+                                        <span className={`text-[10px] font-bold uppercase ${u.web_access === 'EK' ? 'text-[#1e40af]' : u.web_access === 'KAT' ? 'text-[#e2b36e]' : 'text-[#215a6c]'}`}>
+                                            {u.web_access || 'ALL'}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-5 gap-2 mt-auto pt-2 border-t border-white/5">
+                                        <button onClick={() => handleRoleChange(u.username, u.role)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-[#e2b36e] transition-colors" title={u.role === 'admin' ? "Demote" : "Promote"} disabled={processingUser === u.username}>{u.role === 'admin' ? <User size={16} /> : <Shield size={16} />}</button>
+                                        <button onClick={() => openWebAccessModal(u.username, u.web_access || 'ALL')} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-green-400 transition-colors" title="Change Web Access" disabled={processingUser === u.username}><Globe size={16} /></button>
+                                        <button onClick={() => handleResetPassword(u.username)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-yellow-400 transition-colors" title="Reset Password" disabled={processingUser === u.username}><Key size={16} /></button>
+                                        <button onClick={() => handleToggleBan(u.username, u.status)} className={`p-2 rounded hover:bg-white/10 transition-colors ${u.status === 'banned' ? 'text-[#e2b36e]' : 'text-[#e2b36e]/40 hover:text-orange-400'}`} title={u.status === 'banned' ? "Unban" : "Ban"} disabled={processingUser === u.username}>{u.status === 'banned' ? <CheckCircle2 size={16} /> : <Ban size={16} />}</button>
+                                        <button onClick={() => handleDeleteUser(u.username)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-red-500 transition-colors" title="Delete User" disabled={processingUser === u.username}><Trash2 size={16} /></button>
+                                    </div>
                                     {processingUser === u.username && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20"><RefreshCw className="animate-spin text-white" /></div>}
                                 </GlassCard>
                             ))}
@@ -984,10 +1111,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 </div>
             )}
 
-            {/* Transactions & Register Tabs remain the same ... */}
             {activeTab === 'transactions' && (
                 <div className="absolute inset-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="h-16 border-b border-white/10 flex items-center justify-between px-8 bg-white/5 shrink-0">
+                        {/* Transaction Header Content (Kept same) */}
                         <div className="flex items-center gap-4">
                             <h3 className="text-sm font-bold uppercase tracking-widest text-[#e2b36e]/60">Transaction Log</h3>
                             <button onClick={handleResetTransactions} disabled={isTxLoading} className="text-xs text-red-400 hover:text-red-300 hover:underline flex items-center gap-1"><Trash2 size={12} /> Clear History</button>
@@ -1065,6 +1192,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                         <div className="space-y-1"><label className="text-[10px] font-bold text-[#e2b36e]/40 uppercase tracking-widest pl-1">Clearance Level</label><div className="relative"><select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})} className={`w-full bg-black/20 border border-white/10 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:border-[#e2b36e]/50 cursor-pointer ${newUser.role ? 'text-[#e2b36e]' : 'text-[#e2b36e]/40'}`}><option value="" disabled className="bg-[#09232b] text-[#e2b36e]/50">Select Role</option><option value="user" className="bg-[#09232b] text-[#e2b36e]">User</option><option value="admin" className="bg-[#09232b] text-[#e2b36e]">Administrator</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-[#e2b36e]/30 pointer-events-none" size={16} /></div></div>
                                         <div className="space-y-1"><label className="text-[10px] font-bold text-[#e2b36e]/40 uppercase tracking-widest pl-1">Team</label><div className="relative" ref={teamDropdownRef}><button type="button" onClick={() => setIsTeamDropdownOpen(!isTeamDropdownOpen)} className={`w-full bg-black/20 border border-white/10 rounded-xl py-3.5 px-4 text-left focus:outline-none focus:border-[#e2b36e]/50 flex items-center justify-between ${newUser.team ? 'text-[#e2b36e]' : 'text-[#e2b36e]/40'}`}><span>{newUser.team || 'Select Team'}</span><ChevronDown className={`text-[#e2b36e]/30 transition-transform ${isTeamDropdownOpen ? 'rotate-180' : ''}`} size={16} /></button>{isTeamDropdownOpen && (<div className="absolute bottom-full left-0 mb-1 w-full bg-[#09232b] border border-[#e2b36e]/20 rounded-xl shadow-xl overflow-hidden z-50">{TEAMS.map(team => (<button type="button" key={team} onClick={() => { setNewUser({...newUser, team: team}); setIsTeamDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/10 transition-colors ${newUser.team === team ? 'text-[#e2b36e] bg-white/5' : 'text-[#e2b36e]/80'}`}>{team}</button>))}</div>)}</div></div>
                                     </div>
+                                    {/* WEB ACCESS SELECTION */}
+                                    <div className="space-y-1"><label className="text-[10px] font-bold text-[#e2b36e]/40 uppercase tracking-widest pl-1">Web Access</label><div className="relative"><select value={newUser.web_access} onChange={(e) => setNewUser({...newUser, web_access: e.target.value as any})} className={`w-full bg-black/20 border border-white/10 rounded-xl py-3.5 px-4 appearance-none focus:outline-none focus:border-[#e2b36e]/50 cursor-pointer text-[#e2b36e]`}><option value="ALL" className="bg-[#09232b] text-[#e2b36e]">ALL (Astra KAT + EK)</option><option value="EK" className="bg-[#09232b] text-[#e2b36e]">EK Astra Only</option><option value="KAT" className="bg-[#09232b] text-[#e2b36e]">Astra KAT Only</option></select><Globe className="absolute right-4 top-1/2 -translate-y-1/2 text-[#e2b36e]/30 pointer-events-none" size={16} /></div></div>
+                                    
                                     <Button type="submit" variant="primary" isLoading={isProcessing} className="w-full py-4 mt-4 font-bold tracking-widest text-sm shadow-xl">INITIALIZE USER</Button>
                                 </form>
                             </GlassCard>
@@ -1074,10 +1204,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
                                     {bulkUsers.map((u, idx) => (
                                         <div key={idx} className="grid grid-cols-12 gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                                            <div className="col-span-3"><input type="text" placeholder="Username" value={u.username} onChange={(e) => updateBulkUser(idx, 'username', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-[#e2b36e] focus:outline-none focus:bg-white/10" /></div>
-                                            <div className="col-span-3"><input type="text" placeholder="Pass (Auto)" value={u.password} onChange={(e) => updateBulkUser(idx, 'password', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-[#e2b36e] focus:outline-none focus:bg-white/10" /></div>
-                                            <div className="col-span-2"><input type="number" placeholder="Credits" value={u.credits} onChange={(e) => updateBulkUser(idx, 'credits', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-[#e2b36e] focus:outline-none focus:bg-white/10 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]" /></div>
-                                            <div className="col-span-3 flex gap-2"><select value={u.team} onChange={(e) => updateBulkUser(idx, 'team', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-[10px] text-[#e2b36e] focus:outline-none"><option value="" disabled className="bg-[#09232b]">Team</option>{TEAMS.map(t => <option key={t} value={t} className="bg-[#09232b]">{t}</option>)}</select><button onClick={() => removeBulkRow(idx)} disabled={bulkUsers.length === 1} className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30"><Trash2 size={12} /></button></div>
+                                            <div className="col-span-2"><input type="text" placeholder="Username" value={u.username} onChange={(e) => updateBulkUser(idx, 'username', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-[10px] text-[#e2b36e] focus:outline-none focus:bg-white/10" /></div>
+                                            <div className="col-span-2"><input type="text" placeholder="Pass" value={u.password} onChange={(e) => updateBulkUser(idx, 'password', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-[10px] text-[#e2b36e] focus:outline-none focus:bg-white/10" /></div>
+                                            <div className="col-span-2"><input type="number" placeholder="Credits" value={u.credits} onChange={(e) => updateBulkUser(idx, 'credits', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-[10px] text-[#e2b36e] focus:outline-none focus:bg-white/10 appearance-none" /></div>
+                                            <div className="col-span-2"><select value={u.team} onChange={(e) => updateBulkUser(idx, 'team', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-1 py-2 text-[10px] text-[#e2b36e] focus:outline-none"><option value="" disabled className="bg-[#09232b]">Team</option>{TEAMS.map(t => <option key={t} value={t} className="bg-[#09232b]">{t}</option>)}</select></div>
+                                            <div className="col-span-3"><select value={u.web_access} onChange={(e) => updateBulkUser(idx, 'web_access', e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-1 py-2 text-[10px] text-[#e2b36e] focus:outline-none"><option value="ALL" className="bg-[#09232b]">ALL</option><option value="EK" className="bg-[#09232b]">EK</option><option value="KAT" className="bg-[#09232b]">KAT</option></select></div>
+                                            <div className="col-span-1"><button onClick={() => removeBulkRow(idx)} disabled={bulkUsers.length === 1} className="w-full h-full bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 flex items-center justify-center"><Trash2 size={12} /></button></div>
                                         </div>
                                     ))}
                                 </div>
@@ -1093,7 +1225,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
             {activeTab === 'console' && (
                 <div className="absolute inset-0 p-6 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden">
-                    {/* Status Grid */}
+                    {/* Status Grid (Kept same) */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-none">
                         <GlassCard className={`p-4 flex items-center justify-between border-l-4 ${getHealthColor(geminiHealth.status)}`}>
                             <div className="flex items-center gap-3">
@@ -1154,7 +1286,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         </GlassCard>
                     </div>
 
-                    {/* Console Output */}
+                    {/* Console Output (Kept same) */}
                     <GlassCard className="flex-1 p-0 flex flex-col overflow-hidden border-white/20 bg-[#0c0a09]">
                         <div className="flex-none p-3 bg-white/5 border-b border-white/10 flex items-center justify-between">
                             <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#e2b36e]/60">

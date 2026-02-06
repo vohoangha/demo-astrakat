@@ -114,7 +114,8 @@ export interface User {
   role?: 'admin' | 'user';
   status?: 'active' | 'banned';
   team?: string;
-  session_token?: string; // NEW: For Single Session Enforcement
+  session_token?: string;
+  web_access?: 'EK' | 'KAT' | 'ALL'; // Updated BOTH to ALL
 }
 
 export const ASPECT_RATIOS = [

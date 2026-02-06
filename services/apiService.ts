@@ -5,11 +5,11 @@ import { supabase } from "./supabaseClient";
 import bcrypt from 'bcryptjs';
 
 let MOCK_DB_USERS = [
-    { id: 1, username: "admin", credits: 9999, role: 'admin', status: 'active', team: 'EK', passwordHash: '$2a$10$X...', session_token: 'mock-token-1' },
-    { id: 2, username: "caonin", credits: 50.5, role: 'user', status: 'active', team: 'KAT - Architectural', passwordHash: '$2a$10$X...', session_token: 'mock-token-2' },
-    { id: 3, username: "tester_01", credits: 100.2, role: 'user', status: 'active', team: 'KAT - Design', passwordHash: '$2a$10$X...', session_token: 'mock-token-3' },
-    { id: 4, username: "design_lead", credits: 5000, role: 'user', status: 'active', team: 'KAT - Content', passwordHash: '$2a$10$X...', session_token: 'mock-token-4' },
-    { id: 5, username: "new_cadet", credits: 0, role: 'user', status: 'banned', team: 'KAT - Marketing', passwordHash: '$2a$10$X...', session_token: 'mock-token-5' }
+    { id: 1, username: "admin", credits: 9999, role: 'admin', status: 'active', team: 'EK', passwordHash: '$2a$10$X...', session_token: 'mock-token-1', web_access: 'ALL' },
+    { id: 2, username: "caonin", credits: 50.5, role: 'user', status: 'active', team: 'KAT - Architectural', passwordHash: '$2a$10$X...', session_token: 'mock-token-2', web_access: 'KAT' },
+    { id: 3, username: "tester_01", credits: 100.2, role: 'user', status: 'active', team: 'KAT - Design', passwordHash: '$2a$10$X...', session_token: 'mock-token-3', web_access: 'EK' },
+    { id: 4, username: "design_lead", credits: 5000, role: 'user', status: 'active', team: 'KAT - Content', passwordHash: '$2a$10$X...', session_token: 'mock-token-4', web_access: 'ALL' },
+    { id: 5, username: "new_cadet", credits: 0, role: 'user', status: 'banned', team: 'KAT - Marketing', passwordHash: '$2a$10$X...', session_token: 'mock-token-5', web_access: 'ALL' }
 ];
 
 let MOCK_TRANSACTIONS = [
@@ -37,7 +37,6 @@ const generateProfessionalFilename = (promptText: string, quality: string = 'Sta
     if (isEdit) {
         slug = "EditMode";
     } else if (promptText && promptText.trim()) {
-        // Remove accents, keep alphanumeric and spaces, split, take 5 words, join with dash
         const clean = promptText.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9\s]/g, "").trim();
         const words = clean.split(/\s+/).slice(0, 5);
         if (words.length > 0) slug = words.join('-');
@@ -77,9 +76,28 @@ const proxyFetch = async (body: any) => {
     return response.json();
 };
 
+const checkWebAccess = (userAccess: string | undefined) => {
+    const hostname = window.location.hostname;
+    const access = userAccess || 'ALL'; // Default to ALL if null
+
+    // EK Logic: ekastra.vercel.app
+    if (hostname.includes('ekastra')) {
+        if (access !== 'EK' && access !== 'ALL') {
+            throw new Error("Access Denied: Your account is restricted to Astra KAT.");
+        }
+    }
+    // KAT Logic: astra-kat.vercel.app
+    else if (hostname.includes('astra-kat')) {
+        if (access !== 'KAT' && access !== 'ALL') {
+            throw new Error("Access Denied: Your account is restricted to Astra EK.");
+        }
+    }
+    // If localhost or other domain, usually allow or default strict. 
+    // For now, allow local dev.
+};
+
 export const apiService = {
 
-  // Proxy method for Gemini API
   geminiProxy: async (payload: { model: string, contents: any, config?: any }) => {
       try {
           return await proxyFetch({
@@ -102,7 +120,8 @@ export const apiService = {
             role: user.role as any,
             status: user.status as any,
             team: user.team,
-            session_token: user.session_token
+            session_token: user.session_token,
+            web_access: user.web_access as any
           };
       }
 
@@ -114,18 +133,27 @@ export const apiService = {
       
       if (error || !data) return null;
 
+      // Check access even on profile refresh
+      try {
+          checkWebAccess(data.web_access);
+      } catch (e) {
+          // If profile refresh detects wrong domain, return null to force logout or handle in App.tsx
+          return null; 
+      }
+
       return {
         username: data.username,
-        credits: Number(data.credits || 0), // Allow float
+        credits: Number(data.credits || 0),
         avatarUrl: data.avatar_url || '',
         role: data.role as any,
         status: data.status || 'active',
         team: data.team || 'EK',
-        session_token: data.session_token
+        session_token: data.session_token,
+        web_access: data.web_access || 'ALL'
       };
   },
 
-  syncUserToGoogleSheet: async (userData: { username: string, password?: string, credits?: number, team?: string, role?: string, status?: string }) => {
+  syncUserToGoogleSheet: async (userData: { username: string, password?: string, credits?: number, team?: string, role?: string, status?: string, web_access?: string }) => {
      if (!userData.username) return;
 
      try {
@@ -171,6 +199,7 @@ export const apiService = {
              if (lowerUser === DEV_CREDENTIALS.username && password === DEV_CREDENTIALS.password) return MOCK_USER_DATA;
              throw new Error("Invalid credentials.");
         }
+        checkWebAccess(user.web_access); // Check in Dev too
         if (user.status === 'banned' || user.status === 'deleted user') throw new Error("Your account has been banned.");
         
         user.session_token = generateSessionToken();
@@ -182,7 +211,8 @@ export const apiService = {
             role: user.role as any,
             status: user.status as any,
             team: user.team,
-            session_token: user.session_token
+            session_token: user.session_token,
+            web_access: user.web_access as any
         };
     }
 
@@ -195,6 +225,9 @@ export const apiService = {
     if (error || !data) {
         throw new Error("Invalid username or password.");
     }
+
+    // 1. Check Web Access BEFORE checking password (Fail fast if wrong domain)
+    checkWebAccess(data.web_access);
 
     let isMatch = false;
     let needsMigration = false;
@@ -232,17 +265,14 @@ export const apiService = {
         role: data.role as any,
         status: data.status || 'active',
         team: data.team || 'EK',
-        session_token: newSessionToken 
+        session_token: newSessionToken,
+        web_access: data.web_access || 'ALL'
     };
   },
 
   verifySuperAdmin: async (password: string): Promise<boolean> => {
-      if (IS_DEV_MODE) {
-          // In Dev, use simple check for convenience
-          return password === "Astra777";
-      }
+      if (IS_DEV_MODE) return password === "Astra777";
       try {
-          // Send to proxy to verify against server environment variables
           await proxyFetch({ action: 'admin_verify', superAdminPass: password, username: 'admin' });
           return true;
       } catch (e) {
@@ -295,8 +325,6 @@ export const apiService = {
 
   logTransaction: async (username: string, description: string, amount: number, type: 'usage' | 'topup' | 'bonus' | 'adjustment' = 'usage'): Promise<{ success: boolean; newBalance: number }> => {
     const lowerUser = username.toLowerCase();
-    
-    // Support decimals (e.g., 0.2, 0.8)
     const safeAmount = Number(amount.toFixed(2));
 
     if (IS_DEV_MODE) {
@@ -315,12 +343,8 @@ export const apiService = {
         .eq('username', lowerUser)
         .single();
     
-    if (fetchError || !user) {
-        const msg = fetchError ? fetchError.message : "User row not found";
-        throw new Error(`Transaction Init Failed: ${msg}`);
-    }
+    if (fetchError || !user) throw new Error(`Transaction Init Failed: ${fetchError?.message || "User row not found"}`);
 
-    // Support decimals
     const currentCredits = Number(user.credits || 0);
     const newCredits = Number((currentCredits + safeAmount).toFixed(2));
 
@@ -329,9 +353,7 @@ export const apiService = {
         .update({ credits: newCredits })
         .eq('username', lowerUser);
 
-    if (updateError) {
-        throw new Error(`Credit Update Failed: ${updateError.message} (Supabase Column must be 'numeric' not 'int')`);
-    }
+    if (updateError) throw new Error(`Credit Update Failed: ${updateError.message}`);
 
     const prefix = safeAmount >= 0 ? "+" : "";
     const content = `${prefix}${safeAmount} Credits | ${description}`;
@@ -357,7 +379,6 @@ export const apiService = {
 
        try {
            const filename = generateProfessionalFilename(promptText, quality, isEdit);
-           
            await proxyFetch({
                endpointType: 'storage', 
                action: 'upload_generated_image', 
@@ -384,10 +405,7 @@ export const apiService = {
               base64Image: base64Image
           });
 
-          if (!result.success || !result.url) {
-              throw new Error(result.error || "Failed to get image URL");
-          }
-
+          if (!result.success || !result.url) throw new Error(result.error || "Failed to get image URL");
           return result.url;
       } catch (error: any) {
           throw new Error("Failed to upload avatar to Drive.");
@@ -401,16 +419,12 @@ export const apiService = {
                action: 'delete_avatar',
                fileUrl: fileUrl
            });
-       } catch (e) {
-       }
+       } catch (e) { }
    },
 
    updateUserAvatar: async (username: string, avatarUrl: string): Promise<boolean> => {
       if (IS_DEV_MODE) return true;
-      const { error } = await supabase
-        .from('users')
-        .update({ avatar_url: avatarUrl })
-        .eq('username', username);
+      const { error } = await supabase.from('users').update({ avatar_url: avatarUrl }).eq('username', username);
       return !error;
    },
 
@@ -431,11 +445,12 @@ export const apiService = {
       return data.map(u => ({
           id: u.id,
           username: u.username,
-          credits: Number(u.credits), // Allow float
+          credits: Number(u.credits),
           team: u.team,
           role: u.role,
           status: u.status,
-          avatarUrl: u.avatar_url
+          avatarUrl: u.avatar_url,
+          web_access: u.web_access || 'ALL' // Map web_access
       }));
    },
 
@@ -457,7 +472,8 @@ export const apiService = {
           role: newUser.role || 'user',
           team: newUser.team || 'EK',
           status: 'active',
-          session_token: newToken
+          session_token: newToken,
+          web_access: newUser.web_access || 'ALL' // Save web_access
       }]);
 
       if (error) throw new Error(error.message);
@@ -478,10 +494,10 @@ export const apiService = {
               credits: Number(newUser.credits || 0),
               team: newUser.team || 'EK',
               role: newUser.role || 'user',
-              status: 'active'
+              status: 'active',
+              web_access: newUser.web_access || 'ALL'
           });
-      } catch (e) {
-      }
+      } catch (e) { }
 
       return true;
    },
@@ -507,7 +523,8 @@ export const apiService = {
                         role: u.role || 'user',
                         team: u.team || 'EK',
                         status: 'active',
-                        session_token: newToken
+                        session_token: newToken,
+                        web_access: u.web_access || 'ALL'
                     }]);
                     createdCount++;
                     
@@ -527,7 +544,8 @@ export const apiService = {
                         credits: Number(u.credits || 0),
                         team: u.team || 'EK',
                         role: u.role || 'user',
-                        status: 'active'
+                        status: 'active',
+                        web_access: u.web_access || 'ALL'
                     });
                 }
             } catch (e) { }
@@ -543,7 +561,7 @@ export const apiService = {
       let successCount = 0;
       let failedCount = 0;
       const finalType = amount >= 0 ? 'topup' : 'adjustment';
-      const safeAmount = Number(amount.toFixed(2)); // Allow Float
+      const safeAmount = Number(amount.toFixed(2)); 
 
       for (const username of sanitizedTargets) {
           const { data: user } = await supabase.from('users').select('*').eq('username', username).single();
@@ -580,7 +598,6 @@ export const apiService = {
 
    adminUpdateRole: async (targetUsername: string, newRole: string, superAdminPass: string): Promise<boolean> => {
        await proxyFetch({ action: 'admin_update_role', superAdminPass, username: 'admin' });
-
        const { error } = await supabase.from('users').update({ role: newRole }).eq('username', targetUsername);
        if (!error) apiService.syncUserToGoogleSheet({ username: targetUsername, role: newRole });
        return !error;
@@ -588,30 +605,32 @@ export const apiService = {
 
    adminToggleStatus: async (targetUsername: string, newStatus: string, superAdminPass: string): Promise<boolean> => {
        await proxyFetch({ action: 'admin_toggle_status', superAdminPass, username: 'admin' });
-
        const { error } = await supabase.from('users').update({ status: newStatus }).eq('username', targetUsername);
        if (!error) apiService.syncUserToGoogleSheet({ username: targetUsername, status: newStatus });
        return !error;
    },
 
+   // NEW: Update Web Access
+   adminUpdateWebAccess: async (targetUsername: string, newAccess: string, superAdminPass: string): Promise<boolean> => {
+       await proxyFetch({ action: 'admin_update_web_access', superAdminPass, username: 'admin' });
+       const { error } = await supabase.from('users').update({ web_access: newAccess }).eq('username', targetUsername);
+       if (!error) apiService.syncUserToGoogleSheet({ username: targetUsername, web_access: newAccess });
+       return !error;
+   },
+
    adminResetPassword: async (targetUsername: string, superAdminPass: string): Promise<boolean> => {
        await proxyFetch({ action: 'admin_reset_password', superAdminPass, username: 'admin' });
-
        const salt = await bcrypt.genSalt(10);
        const hashedPassword = await bcrypt.hash('Astra123@', salt);
        const newToken = generateSessionToken(); 
        const { error } = await supabase.from('users').update({ password: hashedPassword, session_token: newToken }).eq('username', targetUsername);
-       
        if (!error) apiService.syncUserToGoogleSheet({ username: targetUsername, password: 'Astra123@' });
-
        return !error;
    },
 
    adminDeleteUser: async (targetUsername: string, superAdminPass: string): Promise<boolean> => {
         await proxyFetch({ action: 'admin_delete_user', superAdminPass, username: 'admin' });
-
         const { data: user } = await supabase.from('users').select('credits').eq('username', targetUsername).single();
-        
         const { error } = await supabase.from('users').update({ 
             status: 'deleted user',
             credits: 0,
@@ -619,7 +638,6 @@ export const apiService = {
             avatar_url: '',
             session_token: 'DELETED'
         }).eq('username', targetUsername);
-
         if (!error && user && user.credits > 0) {
              await supabase.from('transactions').insert([{
                   username: targetUsername,
@@ -628,14 +646,12 @@ export const apiService = {
                   type: 'adjustment'
              }]);
         }
-
         if (!error) apiService.syncUserToGoogleSheet({ 
             username: targetUsername, 
             status: 'deleted user', 
             credits: 0,
             password: '[DELETED]' 
         });
-        
         return !error;
    },
    
@@ -644,14 +660,8 @@ export const apiService = {
            await new Promise(r => setTimeout(r, 600));
            return [...MOCK_TRANSACTIONS];
        }
-       const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(300); 
-
+       const { data, error } = await supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(300); 
        if (error) throw new Error(error.message);
-       
        return data.map(t => ({
            date: formatDate(t.created_at),
            username: t.username,
@@ -662,7 +672,6 @@ export const apiService = {
 
    adminResetTransactions: async (superAdminPass: string): Promise<boolean> => {
        await proxyFetch({ action: 'admin_reset_transactions', superAdminPass, username: 'admin' });
-
        const { error: delError } = await supabase.from('transactions').delete().neq('id', 0); 
        return !delError;
    }
