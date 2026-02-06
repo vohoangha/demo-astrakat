@@ -5,7 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import Maintenance from './components/Maintenance';
 import { User } from './types';
 import { getUserFromCookie, saveUserToCookie, removeUserCookie } from './utils/storage';
-import { apiService } from './services/apiService';
+import { apiService, checkWebAccess } from './services/apiService';
 import { useNotification } from './context/NotificationContext';
 import { supabase } from './services/supabaseClient';
 import { IS_DEV_MODE } from './dev/config';
@@ -74,6 +74,21 @@ const App: React.FC = () => {
               return;
           }
 
+          // NEW: Web Access Check
+          const newWebAccess = (newUserFunc.web_access === 'BOTH' ? 'ALL' : newUserFunc.web_access) || 'ALL';
+          try {
+              checkWebAccess(newWebAccess);
+          } catch(e) {
+              setIsSessionValid(false);
+              showNotification(
+                  "Access permissions updated. You no longer have access to this portal.", 
+                  "warning", 
+                  () => { handleSignOut(); }, 
+                  "LOGOUT"
+              );
+              return;
+          }
+
           setUser(prev => {
               if (!prev) return null;
               const updatedUser: User = {
@@ -83,7 +98,8 @@ const App: React.FC = () => {
                   status: newUserFunc.status,
                   team: newUserFunc.team,
                   avatarUrl: newUserFunc.avatar_url,
-                  session_token: newUserFunc.session_token
+                  session_token: newUserFunc.session_token,
+                  web_access: newWebAccess as any 
               };
               if (JSON.stringify(prev) !== JSON.stringify(updatedUser)) {
                   saveUserToCookie(updatedUser);
