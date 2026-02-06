@@ -10,7 +10,7 @@ import { useNotification } from './context/NotificationContext';
 import { supabase } from './services/supabaseClient';
 import { IS_DEV_MODE } from './dev/config';
 
-const IS_MAINTENANCE_MODE = false; 
+const IS_MAINTENANCE_MODE = true; 
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => getUserFromCookie());
