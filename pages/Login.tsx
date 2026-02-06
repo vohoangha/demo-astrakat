@@ -82,9 +82,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <input 
                     type="text" 
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase())}
                     placeholder="Username"
-                    className="w-full bg-[#09232b]/80 border border-[#e2b36e]/20 rounded-xl py-3 pl-10 pr-4 text-[#e2b36e] placeholder-[#e2b36e]/30 focus:outline-none focus:border-[#e2b36e]/60 focus:bg-[#09232b] transition-all lowercase"
+                    className="w-full bg-[#09232b]/80 border border-[#e2b36e]/20 rounded-xl py-3 pl-10 pr-4 text-[#e2b36e] placeholder-[#e2b36e]/30 focus:outline-none focus:border-[#e2b36e]/60 focus:bg-[#09232b] transition-all"
                 />
             </div>
 

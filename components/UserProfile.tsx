@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { LogOut, Upload, ChevronDown, Wallet, Loader2, Lock, ShieldAlert, X } from 'lucide-react';
+import { LogOut, Upload, ChevronDown, Wallet, Loader2, Lock, ShieldAlert, X, ShieldCheck, Eye, EyeOff, Shield } from 'lucide-react';
 import { User } from '../types';
 import { apiService } from '../services/apiService';
 import { saveUserToCookie, saveLocalAvatar, getLocalAvatar } from '../utils/storage';
@@ -33,6 +33,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+
+  // --- SECURITY CHECK STATE ---
+  const [isSecurityCheckOpen, setIsSecurityCheckOpen] = useState(false);
+  const [securityPassword, setSecurityPassword] = useState('');
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [showSecurityPass, setShowSecurityPass] = useState(false);
+  // ----------------------------
 
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passOld, setPassOld] = useState('');
@@ -205,8 +212,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           const newToken = await apiService.changePassword(user.username, passOld, passNew);
           
           setIsPasswordModalOpen(false);
-          // Delegate the success flow to App.tsx via callback
-          // This ensures the local state is updated immediately to prevent the 'Session Mismatch' warning.
           onPasswordChange(newToken);
           
       } catch (err: any) {
@@ -216,13 +221,102 @@ export const UserProfile: React.FC<UserProfileProps> = ({
       }
   };
 
+  // --- SECURITY HANDLERS ---
+  const handleCommandCenterClick = () => {
+      setIsOpen(false);
+      setIsSecurityCheckOpen(true);
+      setSecurityPassword('');
+      setSecurityError(null);
+      setShowSecurityPass(false);
+  };
+
+  const handleSecuritySubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      setSecurityError(null);
+      
+      const SUPER_ADMIN_PASS = "Astra777"; 
+
+      if (securityPassword === SUPER_ADMIN_PASS) {
+          setIsSecurityCheckOpen(false);
+          setShowAdminDashboard(true);
+          // No notification required, instant access
+      } else {
+          setSecurityError("Access Denied: Invalid Security Code.");
+          setSecurityPassword('');
+      }
+  };
+
   return (
     <>
     {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
     
+    {/* SUPER ADMIN SECURITY MODAL - REDESIGNED */}
+    {isSecurityCheckOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
+             <GlassCard className="w-full max-w-sm p-0 relative border border-[#e2b36e]/20 shadow-[0_0_60px_rgba(0,0,0,0.6)] overflow-hidden bg-[#09232b]/80">
+                 
+                 <button 
+                    onClick={() => setIsSecurityCheckOpen(false)} 
+                    className="absolute top-4 right-4 text-[#e2b36e]/30 hover:text-[#e2b36e] transition-colors"
+                 >
+                    <X size={18} />
+                 </button>
+                 
+                 <div className="p-10 flex flex-col items-center">
+                     {/* Shield Icon Container */}
+                     <div className="relative mb-6">
+                         <div className="absolute inset-0 bg-[#e2b36e]/20 blur-xl rounded-full"></div>
+                         <div className="relative p-4 bg-gradient-to-b from-[#103742] to-[#09232b] rounded-2xl border border-[#e2b36e]/30 shadow-lg">
+                            <Shield size={32} className="text-[#e2b36e]" />
+                         </div>
+                     </div>
+
+                     <div className="text-center mb-8">
+                        <h2 className="text-lg font-black uppercase tracking-[0.1em] text-[#e2b36e] drop-shadow-md">Restricted Access</h2>
+                        <p className="text-[10px] text-[#e2b36e]/60 font-mono mt-2 tracking-[0.3em] uppercase">System Administrator Only</p>
+                     </div>
+                     
+                     <form onSubmit={handleSecuritySubmit} className="w-full space-y-4">
+                        <div className="relative group w-full">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#e2b36e]/40 pointer-events-none">
+                                <Lock size={16} />
+                            </div>
+                            <input 
+                                type={showSecurityPass ? "text" : "password"} 
+                                autoFocus
+                                value={securityPassword} 
+                                onChange={(e) => { setSecurityPassword(e.target.value); setSecurityError(null); }}
+                                className={`w-full bg-black/40 border rounded-xl py-3.5 pl-12 pr-10 text-sm text-[#e2b36e] focus:outline-none transition-all placeholder-[#e2b36e]/20 font-mono tracking-widest text-left ${securityError ? 'border-red-500/50 bg-red-500/5 focus:border-red-500' : 'border-[#e2b36e]/20 focus:border-[#e2b36e]/50 focus:bg-black/60'}`}
+                                placeholder="Enter Access Code"
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowSecurityPass(!showSecurityPass)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#e2b36e]/30 hover:text-[#e2b36e] transition-colors p-1"
+                                tabIndex={-1}
+                            >
+                                {showSecurityPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                        </div>
+                        
+                        {securityError && (
+                            <div className="text-[10px] text-red-400 font-bold tracking-wide animate-in slide-in-from-top-1 text-center bg-red-500/10 py-2 rounded-lg border border-red-500/20">
+                                {securityError}
+                            </div>
+                        )}
+                        
+                        <Button type="submit" className="w-full py-3.5 font-extrabold tracking-[0.2em] text-xs shadow-xl mt-2">
+                            ACCESS
+                        </Button>
+                     </form>
+                 </div>
+             </GlassCard>
+        </div>
+    )}
+
     {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <GlassCard className="w-full max-w-sm p-6 relative border border-[#e2b36e]/20 shadow-2xl bg-[#103742]/90">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
+            <GlassCard className="w-full max-w-sm p-6 relative border border-[#e2b36e]/20 shadow-2xl bg-[#103742]/80">
                 <button 
                     onClick={() => setIsPasswordModalOpen(false)} 
                     className="absolute top-4 right-4 text-[#e2b36e]/40 hover:text-[#e2b36e] transition-colors"
@@ -337,7 +431,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 {user.role === 'admin' && (
                     <>
                     <button 
-                        onClick={() => { setIsOpen(false); setShowAdminDashboard(true); }}
+                        onClick={handleCommandCenterClick}
                         className="group w-full flex items-center gap-3 px-3 py-2.5 text-xs text-[#e2b36e] hover:text-[#e2b36e] hover:bg-[#e2b36e]/10 rounded-lg transition-colors text-left"
                     >
                         <div className="p-1.5 bg-[#e2b36e]/20 rounded-md text-[#e2b36e] shrink-0 group-hover:text-[#09232b] group-hover:bg-[#e2b36e] transition-colors">

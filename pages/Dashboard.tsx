@@ -64,14 +64,12 @@ const LIGHTING_GROUPS = {
   ]
 };
 
-interface OnlineUserCounterProps {
+interface OnlinePresenceBeaconProps {
     user: User;
 }
 
-const OnlineUserCounter: React.FC<OnlineUserCounterProps> = ({ user }) => {
-    const [onlineCount, setOnlineCount] = useState<number>(1);
-    const [isLive, setIsLive] = useState(false);
-
+// Logic-only component to register user presence in Firebase
+const OnlinePresenceBeacon: React.FC<OnlinePresenceBeaconProps> = ({ user }) => {
     useEffect(() => {
         if (!user || !user.username) return;
 
@@ -80,9 +78,8 @@ const OnlineUserCounter: React.FC<OnlineUserCounterProps> = ({ user }) => {
         
         // Define references
         const userStatusRef = ref(db, `online_users/${safeKey}`);
-        const allUsersRef = ref(db, 'online_users');
 
-        // 1. Set user as online
+        // Set user as online
         set(userStatusRef, {
             username: user.username,
             team: user.team || 'Unknown',
@@ -90,41 +87,19 @@ const OnlineUserCounter: React.FC<OnlineUserCounterProps> = ({ user }) => {
             last_seen: serverTimestamp(),
             state: 'online'
         }).then(() => {
-            // 2. Configure automatic removal on disconnect (tab close/internet loss)
+            // Configure automatic removal on disconnect (tab close/internet loss)
             onDisconnect(userStatusRef).remove();
-            setIsLive(true);
         }).catch((err) => {
             console.error("Firebase connection error:", err);
-            setIsLive(false);
-        });
-
-        // 3. Listen for changes in the online_users list to update count
-        const unsubscribe = onValue(allUsersRef, (snapshot) => {
-            if (snapshot.exists()) {
-                setOnlineCount(snapshot.size); // .size returns number of children
-            } else {
-                setOnlineCount(1);
-            }
         });
 
         // Cleanup on component unmount
         return () => {
-            unsubscribe();
             remove(userStatusRef); // Explicitly remove if user navigates away within app
         };
     }, [user]);
 
-    return (
-        <div className="flex items-center gap-2 px-3 py-1 bg-[#e2b36e]/10 border border-[#e2b36e]/30 rounded-full mb-2 backdrop-blur-sm animate-in fade-in duration-500">
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLive ? 'bg-[#e2b36e]' : 'bg-red-500'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-[#e2b36e]' : 'bg-red-500'}`}></span>
-            </span>
-            <span className="text-[10px] font-bold text-[#e2b36e] uppercase tracking-wider">
-                {onlineCount} Online Now
-            </span>
-        </div>
-    );
+    return null; // Invisible component
 };
 
 interface DashboardProps {
@@ -738,6 +713,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut, onPasswor
 
   return (
     <div className="min-h-screen w-full relative bg-[#103742] selection:bg-[#e2b36e] selection:text-[#103742] flex flex-col">
+      {/* Invisible Beacon to track online presence */}
+      <OnlinePresenceBeacon user={currentUser} />
+
       {previewImage && (
         <FullScreenViewer 
             src={previewImage} 
@@ -806,6 +784,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut, onPasswor
       
       <div className="flex-1 w-full max-w-[1920px] mx-auto px-6 md:px-12 lg:px-20 xl:px-28 flex flex-col lg:flex-row gap-16 relative z-10 items-stretch min-h-[calc(100vh-7rem)] pb-24">
           <GlassCard className="w-full lg:w-[360px] xl:w-[420px] shrink-0 flex flex-col p-5 lg:p-6 h-full relative z-50 border-[#e2b36e]/20">
+             {/* ... (Rest of content remains the same) ... */}
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 flex-none">
                    <div className="relative" ref={typeDropdownRef}>
                     <label className={`block text-xs font-semibold mb-1.5 flex items-center gap-1.5 transition-colors duration-300 ${isGraphicModeActive ? 'text-[#e2b36e] drop-shadow-[0_0_8px_rgba(226,179,110,0.5)]' : 'text-[#e2b36e]/70'}`}><Palette size={12} /> Graphic Design Mode</label>
@@ -900,6 +879,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut, onPasswor
              )}
 
              <div className="flex flex-col gap-4 mb-6 mt-4 flex-none">
+                   {/* References and Input Images Drag & Drop Areas */}
                    <div className={`border border-dashed rounded-lg p-2.5 transition-colors flex flex-col h-32 overflow-hidden ${draggingItem?.type === 'input' ? 'border-[#e2b36e] bg-[#e2b36e]/10' : 'border-[#e2b36e]/30 bg-[#09232b]/40'}`} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'reference')}>
                     <div className="flex items-center justify-between mb-1"><label className="text-xs font-bold text-[#e2b36e] flex items-center gap-1.5"><CopyPlus size={12} /> References</label><span className="text-[10px] text-[#e2b36e]/50">{referenceImages.length}/20</span></div>
                     <div className="flex flex-wrap gap-2 overflow-y-auto custom-scrollbar flex-1 content-start p-1 -m-1 pl-2 pt-2 pr-2">
@@ -1053,7 +1033,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut, onPasswor
           </div>
       </div>
       <footer className="flex-none w-full text-center py-6 mt-auto text-[#e2b36e]/40 text-sm font-medium uppercase tracking-widest opacity-80 hover:opacity-100 transition-opacity duration-500 select-none flex flex-col items-center gap-3">
-          <OnlineUserCounter user={currentUser} />
           <span className="drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Powered by Eric</span>
       </footer>
     </div>

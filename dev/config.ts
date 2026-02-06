@@ -1,7 +1,7 @@
 
 import { User } from "../types";
 
-const ENABLE_MOCK_LOGIN = false; 
+const ENABLE_MOCK_LOGIN = true; 
 
 const isProductionBuild = () => {
     try {

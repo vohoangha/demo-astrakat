@@ -72,7 +72,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     <NotificationContext.Provider value={{ showNotification, closeNotification }}>
       {children}
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
            <GlassCard className={`max-w-sm w-full p-0 flex flex-col items-center text-center relative bg-gradient-to-br ${getColorClass()} overflow-hidden ring-1 ring-[#e2b36e]/10`}>
                 
                 {/* Close Button (X) - Hidden for critical warnings */}

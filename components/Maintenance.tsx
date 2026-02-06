@@ -4,11 +4,11 @@ import { GlassCard } from './GlassCard';
 
 const Maintenance: React.FC = () => {
   return (
-    <div className="h-screen w-full relative bg-[#103742] overflow-hidden flex flex-col items-center justify-center selection:bg-red-500 selection:text-white">
+    <div className="h-screen w-full relative bg-[#103742] overflow-hidden flex flex-col items-center justify-center selection:bg-[#e2b36e] selection:text-[#103742]">
       
       {/* BACKGROUND - STATIC & GPU ACCELERATED */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none transform-gpu translate-z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-[#103742] via-[#09232b] to-[#103742] blur-[120px] opacity-40 will-change-transform"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-[#1c4e5f] via-[#103742] to-[#09232b] blur-[120px] opacity-40 will-change-transform"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-[#e2b36e] via-[#b28e67] to-[#103742] blur-[120px] opacity-20 will-change-transform"></div>
         
         {/* Added Dark Overlay to match App.tsx */}
@@ -35,8 +35,8 @@ const Maintenance: React.FC = () => {
                   />
               </div>
               <div className="flex flex-col justify-center">
-                  <h1 className="text-4xl font-black text-[#e2b36e] tracking-tighter leading-none uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">ASTRA</h1>
-                  <p className="text-[0.6rem] font-bold tracking-[0.4em] uppercase text-[#e2b36e]/50 pl-0.5 leading-none mt-1.5">Creatives from the stars</p>
+                  <h1 className="text-4xl font-black text-white tracking-tighter leading-none uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">ASTRA</h1>
+                  <p className="text-[0.6rem] font-bold tracking-[0.4em] uppercase text-white/50 pl-0.5 leading-none mt-1.5">Creatives from the stars</p>
               </div>
           </div>
       </header>
@@ -57,7 +57,7 @@ const Maintenance: React.FC = () => {
             `}</style>
             
             {/* Background Glow */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#e2b36e]/30 to-[#ffffff]/30 blur-2xl rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#103742]/30 to-[#e2b36e]/30 blur-2xl rounded-full animate-pulse"></div>
 
             <svg 
                 width="80" 
@@ -68,15 +68,15 @@ const Maintenance: React.FC = () => {
             >
                 <defs>
                     <linearGradient id="astraGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#e2b36e" /> {/* Gold */}
-                        <stop offset="50%" stopColor="#ffffff" /> {/* White */}
-                        <stop offset="100%" stopColor="#103742" /> {/* Teal */}
+                        <stop offset="0%" stopColor="#103742" /> {/* Deep Teal */}
+                        <stop offset="50%" stopColor="#e2b36e" /> {/* Gold */}
+                        <stop offset="100%" stopColor="#09232b" /> {/* Dark Teal */}
                     </linearGradient>
                 </defs>
                 <path 
                     d="M 50 0 C 50 35 60 45 100 50 C 60 55 50 65 50 100 C 50 65 40 55 0 50 C 40 45 50 35 50 0 Z" 
                     fill="url(#astraGradient)" 
-                    stroke="white"
+                    stroke="#e2b36e"
                     strokeWidth="1"
                     strokeLinejoin="round"
                 />

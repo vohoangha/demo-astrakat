@@ -728,7 +728,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   return (
     <>
     {isSecurityModalOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
              <GlassCard className="w-full max-w-sm p-0 relative border border-[#e2b36e]/30 shadow-[0_0_50px_rgba(226,179,110,0.15)] overflow-hidden">
                  <div className="h-1 w-full bg-gradient-to-r from-[#e2b36e] to-[#b28e67]"></div>
                  <div className="p-6">
@@ -783,10 +783,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     )}
 
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-hidden font-sans">
-      <div className="absolute inset-0 bg-[#103742]/90 backdrop-blur-3xl animate-in fade-in duration-500" onClick={onClose}>
-         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#09232b]/80 via-[#103742] to-black pointer-events-none"></div>
-         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 pointer-events-none mix-blend-screen"></div>
-      </div>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-md animate-in fade-in duration-500" onClick={onClose}></div>
       
       <div className="relative w-full max-w-7xl h-[90vh] flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-500 shadow-2xl rounded-3xl overflow-hidden border border-[#e2b36e]/20 ring-1 ring-[#e2b36e]/10 bg-[#103742]/60 backdrop-blur-2xl">
          
@@ -818,6 +815,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         {isSyncingSheet ? `Stop (${syncProgress.current}/${syncProgress.total})` : 'Update Sheet'}
                     </button>
                 )}
+
+                {/* ONLINE USER COUNTER IN HEADER - MOVED HERE */}
+                <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#e2b36e]/10 border border-[#e2b36e]/20 rounded-full shadow-[0_0_10px_rgba(226,179,110,0.1)] mr-2">
+                    <span className="relative flex h-2 w-2">
+                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#e2b36e] opacity-75"></span>
+                       <span className="relative inline-flex rounded-full h-2 w-2 bg-[#e2b36e]"></span>
+                    </span>
+                    <span className="text-[10px] font-bold text-[#e2b36e] uppercase tracking-wider">
+                       {onlineUsers.size} Online Now
+                    </span>
+                </div>
 
                 {activeTab !== 'console' && (
                     <button 

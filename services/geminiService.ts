@@ -200,6 +200,13 @@ async function safeGenerateContent(params: any) {
                 return proxyRes;
             }
 
+            // Handle Invalid API Key (400) - Treat as "Dead Key" and skip
+            if (msg.includes("api key not valid") || msg.includes("api_key_invalid")) {
+                 console.warn(`[ASTRA Rotation] Key #${i + 1} is Invalid/Expired. Skipping.`);
+                 failedKeys.add(apiKey);
+                 continue;
+            }
+
             // Retryable Errors (Quota, Overloaded)
             if (msg.includes("429") || msg.includes("quota") || msg.includes("503") || msg.includes("overloaded")) {
                 console.warn(`[ASTRA Rotation] Key #${i + 1} failed (${msg}). Marking as dead for 60s.`);
@@ -279,6 +286,7 @@ export async function testGeminiConnection(): Promise<{ latency: number, status:
         if (lowerMsg.includes("generativelanguage.googleapis.com") && (lowerMsg.includes("referer") || lowerMsg.includes("referrer"))) {
              helpfulMsg = "Referrer Blocked (Proxy Failed)";
         }
+        if (lowerMsg.includes("api key not valid")) helpfulMsg = "Invalid API Key (Check .env)";
         
         return { latency: 0, status: 'error', message: helpfulMsg };
     }
