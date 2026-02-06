@@ -115,7 +115,7 @@ export interface User {
   status?: 'active' | 'banned';
   team?: string;
   session_token?: string;
-  web_access?: 'EK' | 'KAT' | 'ALL'; // Updated BOTH to ALL
+  web_access?: 'EK' | 'KAT' | 'ALL'; 
 }
 
 export const ASPECT_RATIOS = [

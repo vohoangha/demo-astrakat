@@ -78,7 +78,9 @@ const proxyFetch = async (body: any) => {
 
 const checkWebAccess = (userAccess: string | undefined) => {
     const hostname = window.location.hostname;
-    const access = userAccess || 'ALL'; // Default to ALL if null
+    // Map existing 'BOTH' to 'ALL' for backward compatibility
+    let access = userAccess || 'ALL';
+    if (access === 'BOTH') access = 'ALL';
 
     // EK Logic: ekastra.vercel.app
     if (hostname.includes('ekastra')) {
@@ -149,7 +151,7 @@ export const apiService = {
         status: data.status || 'active',
         team: data.team || 'EK',
         session_token: data.session_token,
-        web_access: data.web_access || 'ALL'
+        web_access: (data.web_access === 'BOTH' ? 'ALL' : data.web_access) || 'ALL'
       };
   },
 
@@ -266,7 +268,7 @@ export const apiService = {
         status: data.status || 'active',
         team: data.team || 'EK',
         session_token: newSessionToken,
-        web_access: data.web_access || 'ALL'
+        web_access: (data.web_access === 'BOTH' ? 'ALL' : data.web_access) || 'ALL'
     };
   },
 
@@ -450,7 +452,7 @@ export const apiService = {
           role: u.role,
           status: u.status,
           avatarUrl: u.avatar_url,
-          web_access: u.web_access || 'ALL' // Map web_access
+          web_access: (u.web_access === 'BOTH' ? 'ALL' : u.web_access) || 'ALL' // Map web_access
       }));
    },
 

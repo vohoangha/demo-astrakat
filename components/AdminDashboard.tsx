@@ -1092,13 +1092,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                         <Globe size={12} className={u.web_access === 'EK' ? 'text-[#1e40af]' : u.web_access === 'KAT' ? 'text-[#e2b36e]' : 'text-[#215a6c]'} />
                                         <span className="text-[10px] font-bold text-[#e2b36e]/60 uppercase tracking-wide flex-1">PORTAL:</span>
                                         <span className={`text-[10px] font-bold uppercase ${u.web_access === 'EK' ? 'text-[#1e40af]' : u.web_access === 'KAT' ? 'text-[#e2b36e]' : 'text-[#215a6c]'}`}>
-                                            {u.web_access || 'ALL'}
+                                            {u.web_access === 'BOTH' ? 'ALL' : (u.web_access || 'ALL')}
                                         </span>
                                     </div>
 
                                     <div className="grid grid-cols-5 gap-2 mt-auto pt-2 border-t border-white/5">
                                         <button onClick={() => handleRoleChange(u.username, u.role)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-[#e2b36e] transition-colors" title={u.role === 'admin' ? "Demote" : "Promote"} disabled={processingUser === u.username}>{u.role === 'admin' ? <User size={16} /> : <Shield size={16} />}</button>
-                                        <button onClick={() => openWebAccessModal(u.username, u.web_access || 'ALL')} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-green-400 transition-colors" title="Change Web Access" disabled={processingUser === u.username}><Globe size={16} /></button>
+                                        <button onClick={() => openWebAccessModal(u.username, u.web_access === 'BOTH' ? 'ALL' : (u.web_access || 'ALL'))} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-green-400 transition-colors" title="Change Web Access" disabled={processingUser === u.username}><Globe size={16} /></button>
                                         <button onClick={() => handleResetPassword(u.username)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-yellow-400 transition-colors" title="Reset Password" disabled={processingUser === u.username}><Key size={16} /></button>
                                         <button onClick={() => handleToggleBan(u.username, u.status)} className={`p-2 rounded hover:bg-white/10 transition-colors ${u.status === 'banned' ? 'text-[#e2b36e]' : 'text-[#e2b36e]/40 hover:text-orange-400'}`} title={u.status === 'banned' ? "Unban" : "Ban"} disabled={processingUser === u.username}>{u.status === 'banned' ? <CheckCircle2 size={16} /> : <Ban size={16} />}</button>
                                         <button onClick={() => handleDeleteUser(u.username)} className="p-2 rounded hover:bg-white/10 text-[#e2b36e]/40 hover:text-red-500 transition-colors" title="Delete User" disabled={processingUser === u.username}><Trash2 size={16} /></button>
