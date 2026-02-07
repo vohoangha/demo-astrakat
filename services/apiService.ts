@@ -135,11 +135,13 @@ export const apiService = {
       
       if (error || !data) return null;
 
+      // Map 'portal' column to 'web_access' property
+      const dbAccess = data.portal || data.web_access;
+
       // Check access even on profile refresh
       try {
-          checkWebAccess(data.web_access);
+          checkWebAccess(dbAccess);
       } catch (e) {
-          // If profile refresh detects wrong domain, return null to force logout or handle in App.tsx
           return null; 
       }
 
@@ -151,7 +153,7 @@ export const apiService = {
         status: data.status || 'active',
         team: data.team || 'EK',
         session_token: data.session_token,
-        web_access: (data.web_access === 'BOTH' ? 'ALL' : data.web_access) || 'ALL'
+        web_access: (dbAccess === 'BOTH' ? 'ALL' : dbAccess) || 'ALL'
       };
   },
 
@@ -229,7 +231,9 @@ export const apiService = {
     }
 
     // 1. Check Web Access BEFORE checking password (Fail fast if wrong domain)
-    checkWebAccess(data.web_access);
+    // Map 'portal' column
+    const dbAccess = data.portal || data.web_access;
+    checkWebAccess(dbAccess);
 
     let isMatch = false;
     let needsMigration = false;
@@ -268,7 +272,7 @@ export const apiService = {
         status: data.status || 'active',
         team: data.team || 'EK',
         session_token: newSessionToken,
-        web_access: (data.web_access === 'BOTH' ? 'ALL' : data.web_access) || 'ALL'
+        web_access: (dbAccess === 'BOTH' ? 'ALL' : dbAccess) || 'ALL'
     };
   },
 
@@ -452,7 +456,7 @@ export const apiService = {
           role: u.role,
           status: u.status,
           avatarUrl: u.avatar_url,
-          web_access: (u.web_access === 'BOTH' ? 'ALL' : u.web_access) || 'ALL' // Map web_access
+          web_access: (u.portal === 'BOTH' ? 'ALL' : u.portal) || (u.web_access || 'ALL') // Map DB 'portal' to type 'web_access'
       }));
    },
 
@@ -475,7 +479,7 @@ export const apiService = {
           team: newUser.team || 'EK',
           status: 'active',
           session_token: newToken,
-          web_access: newUser.web_access || 'ALL' // Save web_access
+          portal: newUser.web_access || 'ALL' // Write to 'portal' column
       }]);
 
       if (error) throw new Error(error.message);
@@ -526,7 +530,7 @@ export const apiService = {
                         team: u.team || 'EK',
                         status: 'active',
                         session_token: newToken,
-                        web_access: u.web_access || 'ALL'
+                        portal: u.web_access || 'ALL' // Write to 'portal' column
                     }]);
                     createdCount++;
                     
@@ -612,10 +616,14 @@ export const apiService = {
        return !error;
    },
 
-   // NEW: Update Web Access
+   // NEW: Update Web Access (Portal)
    adminUpdateWebAccess: async (targetUsername: string, newAccess: string, superAdminPass: string): Promise<boolean> => {
        await proxyFetch({ action: 'admin_update_web_access', superAdminPass, username: 'admin' });
-       const { error } = await supabase.from('users').update({ web_access: newAccess }).eq('username', targetUsername);
+       
+       // Update 'portal' column in DB
+       const { error } = await supabase.from('users').update({ portal: newAccess }).eq('username', targetUsername);
+       
+       // Sync to Google Sheet (using 'web_access' key as per sheet logic)
        if (!error) apiService.syncUserToGoogleSheet({ username: targetUsername, web_access: newAccess });
        return !error;
    },
