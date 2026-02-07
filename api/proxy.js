@@ -1,3 +1,4 @@
+
 // Memory cache for bad keys (Global variable survives warm restarts in Vercel/Node)
 const failedKeys = new Set();
 let lastFailureReset = Date.now();
@@ -115,18 +116,35 @@ export default async function handler(req, res) {
     const rawSuperAdmin = process.env.SUPER_ADMIN || process.env.VITE_SUPER_ADMIN || "astra_super_secret";
     const SUPER_ADMIN_SECRET = rawSuperAdmin.trim();
 
-    if (action === 'login' && ADMIN_USER && ADMIN_PASS) {
-        if (payload.username === ADMIN_USER && payload.password === ADMIN_PASS) {
-             return res.status(200).json({
-                 username: 'admin', 
-                 credits: 9999,
-                 avatarUrl: '',
-                 role: 'admin',
-                 status: 'active'
-             });
+    // --- SERVER SIDE ADMIN LOGIN ---
+    if (action === 'login') {
+        // Only verify if Env Vars are actually set
+        if (ADMIN_USER && ADMIN_PASS) {
+            if (payload.username === ADMIN_USER && payload.password === ADMIN_PASS) {
+                 return res.status(200).json({
+                     username: 'admin', 
+                     credits: 9999,
+                     avatarUrl: '',
+                     role: 'admin',
+                     status: 'active',
+                     web_access: 'ALL', // Explicitly grant ALL access
+                     portal: 'ALL'
+                 });
+            } else {
+                // If creds are set but don't match, return 401 so apiService knows specifically it failed server auth
+                // But we must allow fall-through if username isn't 'admin'
+                if (payload.username === ADMIN_USER) {
+                    return res.status(401).json({ error: 'Invalid Admin Credentials' });
+                }
+            }
         }
+        // If logic reaches here, it means it wasn't the Vercel Admin, so we allow 
+        // the request to fall through? No, 'login' action is unique. 
+        // If it's not the Vercel Admin, return 404/400 so apiService tries Supabase.
+        return res.status(400).json({ error: 'Not Server Admin' }); 
     }
 
+    // --- SESSION CHECK FOR NON-LOGIN ACTIONS ---
     if (action !== 'login') {
         const cookieHeader = req.headers.cookie || '';
         const cookies = Object.fromEntries(
@@ -157,12 +175,13 @@ export default async function handler(req, res) {
                  return res.status(403).json({ error: 'Forbidden' });
             }
 
+            // --- SENSITIVE ACTION ALLOWLIST ---
             const SENSITIVE_ACTIONS = [
-                'admin_verify', // Added for Dashboard Access Check
+                'admin_verify', 
                 'admin_top_up', 
                 'admin_update_role', 
                 'admin_toggle_status', 
-                'admin_update_web_access',
+                'admin_update_web_access', // Critical: Added access update
                 'admin_reset_password', 
                 'admin_delete_user', 
                 'admin_create_user',
@@ -172,13 +191,17 @@ export default async function handler(req, res) {
 
             if (SENSITIVE_ACTIONS.includes(action)) {
                 if (!superAdminPass || superAdminPass !== SUPER_ADMIN_SECRET) {
-                    return res.status(403).json({ error: 'Access Denied' });
+                    return res.status(403).json({ error: 'Access Denied: Invalid Security Code' });
                 }
+                // Stop processing and return success. 
+                // These actions don't go to Google Script (unless needed later, but usually handled by apiService DB calls)
+                // Wait... apiService calls proxyFetch for these to verify pass, THEN calls Supabase. 
+                // So checking pass here is the goal.
                 return res.status(200).json({ success: true, message: "Authorized" });
             }
 
         } catch (e) {
-            return res.status(401).json({ error: 'Unauthorized' });
+            return res.status(401).json({ error: 'Unauthorized Session' });
         }
     }
 

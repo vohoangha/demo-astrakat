@@ -98,6 +98,27 @@ export const checkWebAccess = (userAccess: string | undefined) => {
     // For now, allow local dev.
 };
 
+// HELPER: Find first available ID gaps
+const getAvailableIds = async (count: number = 1): Promise<number[]> => {
+    if (IS_DEV_MODE) {
+        let next = MOCK_DB_USERS.length + 1;
+        return Array.from({length: count}, () => next++);
+    }
+
+    const { data } = await supabase.from('users').select('id').order('id', { ascending: true });
+    const existingIds = new Set((data || []).map(u => u.id));
+    
+    const availableIds: number[] = [];
+    let candidate = 1;
+    while (availableIds.length < count) {
+        if (!existingIds.has(candidate)) {
+            availableIds.push(candidate);
+        }
+        candidate++;
+    }
+    return availableIds;
+};
+
 export const apiService = {
 
   geminiProxy: async (payload: { model: string, contents: any, config?: any }) => {
@@ -220,6 +241,35 @@ export const apiService = {
         };
     }
 
+    // --- PRIORITY 1: CHECK VERCEL SERVER ADMIN ---
+    if (lowerUser === 'admin') {
+        try {
+            // Attempt to login via Proxy (checking process.env variables)
+            const adminAuth = await proxyFetch({
+                action: 'login',
+                username: lowerUser,
+                password: password
+            });
+
+            if (adminAuth && adminAuth.username === 'admin') {
+                return {
+                    username: 'admin',
+                    credits: adminAuth.credits || 9999,
+                    avatarUrl: adminAuth.avatarUrl || '',
+                    role: 'admin',
+                    status: 'active',
+                    team: 'EK',
+                    session_token: 'admin-vercel-session-' + Date.now(),
+                    web_access: 'ALL' // Admin via Env always has ALL access
+                };
+            }
+        } catch (e) {
+            // If server returns 401/400 (not env admin), simply fall through to Supabase check
+            // console.warn("Env Admin Login failed, trying Supabase...", e);
+        }
+    }
+
+    // --- PRIORITY 2: CHECK SUPABASE ---
     const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -464,25 +514,50 @@ export const apiService = {
       await proxyFetch({ action: 'admin_create_user', superAdminPass, username: 'admin' });
 
       const lowerUser = newUser.username.toLowerCase().trim();
-      const { data: existing } = await supabase.from('users').select('id').eq('username', lowerUser).single();
-      if (existing) throw new Error("Username already exists.");
-
+      // SELECT ALL to check for 'deleted user' status
+      const { data: existing } = await supabase.from('users').select('*').eq('username', lowerUser).single();
+      
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(newUser.password, salt);
       const newToken = generateSessionToken();
 
-      const { error } = await supabase.from('users').insert([{
-          username: lowerUser,
-          password: hashedPassword,
-          credits: Number(newUser.credits || 0),
-          role: newUser.role || 'user',
-          team: newUser.team || 'EK',
-          status: 'active',
-          session_token: newToken,
-          portal: newUser.web_access || 'ALL' // Write to 'portal' column
-      }]);
+      if (existing) {
+          if (existing.status === 'deleted user') {
+              // REUSE LOGIC: Update the existing deleted row to make it active again
+              // This preserves the original ID (and fills that "gap" visually)
+              const { error: updateError } = await supabase.from('users').update({
+                  password: hashedPassword,
+                  credits: Number(newUser.credits || 0),
+                  role: newUser.role || 'user',
+                  team: newUser.team || 'EK',
+                  status: 'active',
+                  session_token: newToken,
+                  portal: newUser.web_access || 'ALL',
+                  avatar_url: '' // Reset avatar
+              }).eq('id', existing.id);
 
-      if (error) throw new Error(error.message);
+              if (updateError) throw new Error("Failed to reactivate user: " + updateError.message);
+          } else {
+              throw new Error("Username already exists.");
+          }
+      } else {
+          // INSERT LOGIC: New user
+          // Calculate the lowest available ID to fill gaps (e.g. if 22 exists, and we deleted 23, we want 23)
+          const [newId] = await getAvailableIds(1);
+
+          const { error } = await supabase.from('users').insert([{
+              id: newId, // Explicitly set ID
+              username: lowerUser,
+              password: hashedPassword,
+              credits: Number(newUser.credits || 0),
+              role: newUser.role || 'user',
+              team: newUser.team || 'EK',
+              status: 'active',
+              session_token: newToken,
+              portal: newUser.web_access || 'ALL'
+          }]);
+          if (error) throw new Error(error.message);
+      }
       
       if (newUser.credits > 0) {
           await supabase.from('transactions').insert([{
@@ -514,15 +589,55 @@ export const apiService = {
         const sanitizedUsers = users.map(u => ({ ...u, username: u.username.toLowerCase().trim() }));
         let createdCount = 0;
         
+        // 1. Identify which users are NEW (not existing, not deleted)
+        // We do this by checking all usernames first
+        const allUsernames = sanitizedUsers.map(u => u.username);
+        const { data: existingData } = await supabase.from('users').select('username, id, status').in('username', allUsernames);
+        
+        const existingMap = new Map();
+        if (existingData) {
+            existingData.forEach(r => existingMap.set(r.username, r));
+        }
+
+        const usersToInsertCount = sanitizedUsers.filter(u => !existingMap.has(u.username)).length;
+        
+        // 2. Fetch available IDs for new users
+        let availableIds: number[] = [];
+        if (usersToInsertCount > 0) {
+            availableIds = await getAvailableIds(usersToInsertCount);
+        }
+        let idCounter = 0;
+
         for (const u of sanitizedUsers) {
             try {
-                const { data: existing } = await supabase.from('users').select('id').eq('username', u.username).single();
-                if (!existing) {
-                    const salt = await bcrypt.genSalt(10);
-                    const hashedPassword = await bcrypt.hash(u.password || 'Astra123@', salt);
-                    const newToken = generateSessionToken();
+                const existing = existingMap.get(u.username);
+                
+                const salt = await bcrypt.genSalt(10);
+                const hashedPassword = await bcrypt.hash(u.password || 'Astra123@', salt);
+                const newToken = generateSessionToken();
 
+                if (existing) {
+                    if (existing.status === 'deleted user') {
+                        // REUSE existing ID from soft-delete
+                        await supabase.from('users').update({
+                            password: hashedPassword,
+                            credits: Number(u.credits || 0),
+                            role: u.role || 'user',
+                            team: u.team || 'EK',
+                            status: 'active',
+                            session_token: newToken,
+                            portal: u.web_access || 'ALL',
+                            avatar_url: ''
+                        }).eq('id', existing.id);
+                        createdCount++;
+                    }
+                    // If exists and active, do nothing
+                } else {
+                    // INSERT new with gap-filled ID
+                    const newId = availableIds[idCounter++];
+                    
                     await supabase.from('users').insert([{
+                        id: newId,
                         username: u.username,
                         password: hashedPassword,
                         credits: Number(u.credits || 0),
@@ -530,30 +645,30 @@ export const apiService = {
                         team: u.team || 'EK',
                         status: 'active',
                         session_token: newToken,
-                        portal: u.web_access || 'ALL' // Write to 'portal' column
+                        portal: u.web_access || 'ALL'
                     }]);
                     createdCount++;
-                    
-                     if (u.credits > 0) {
-                        await supabase.from('transactions').insert([{
-                            username: u.username,
-                            amount: Number(u.credits),
-                            content: `+${Number(u.credits)} Fresh start Credits`,
-                            type: 'bonus'
-                        }]);
-                    }
-
-                    await new Promise(r => setTimeout(r, 200));
-                    apiService.syncUserToGoogleSheet({
-                        username: u.username,
-                        password: u.password || 'Astra123@',
-                        credits: Number(u.credits || 0),
-                        team: u.team || 'EK',
-                        role: u.role || 'user',
-                        status: 'active',
-                        web_access: u.web_access || 'ALL'
-                    });
                 }
+
+                if (u.credits > 0) {
+                    await supabase.from('transactions').insert([{
+                        username: u.username,
+                        amount: Number(u.credits),
+                        content: `+${Number(u.credits)} Fresh start Credits`,
+                        type: 'bonus'
+                    }]);
+                }
+
+                await new Promise(r => setTimeout(r, 200));
+                apiService.syncUserToGoogleSheet({
+                    username: u.username,
+                    password: u.password || 'Astra123@',
+                    credits: Number(u.credits || 0),
+                    team: u.team || 'EK',
+                    role: u.role || 'user',
+                    status: 'active',
+                    web_access: u.web_access || 'ALL'
+                });
             } catch (e) { }
         }
 
@@ -682,6 +797,17 @@ export const apiService = {
 
    adminResetTransactions: async (superAdminPass: string): Promise<boolean> => {
        await proxyFetch({ action: 'admin_reset_transactions', superAdminPass, username: 'admin' });
+       
+       // TRY RPC FIRST (Require function 'reset_transactions' on Supabase)
+       // SQL to create: create or replace function reset_transactions() returns void as $$ begin truncate table transactions restart identity; end; $$ language plpgsql;
+       try {
+           const { error: rpcError } = await supabase.rpc('reset_transactions');
+           if (!rpcError) return true;
+       } catch(e) {
+           console.warn("RPC reset_transactions not found. Falling back to DELETE (ID sequence will not reset).");
+       }
+
+       // FALLBACK: Standard Delete (Does NOT reset ID sequence)
        const { error: delError } = await supabase.from('transactions').delete().neq('id', 0); 
        return !delError;
    }
