@@ -75,7 +75,10 @@ const App: React.FC = () => {
           }
 
           // NEW: Web Access Check
-          const newWebAccess = (newUserFunc.web_access === 'BOTH' ? 'ALL' : newUserFunc.web_access) || 'ALL';
+          // Fix: Read 'portal' from DB payload (fallback to web_access if schema differs)
+          const dbPortal = newUserFunc.portal || newUserFunc.web_access;
+          const newWebAccess = (dbPortal === 'BOTH' ? 'ALL' : dbPortal) || 'ALL';
+          
           try {
               checkWebAccess(newWebAccess);
           } catch(e) {
